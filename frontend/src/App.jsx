@@ -291,10 +291,38 @@ export default function App() {
   const onDrop = useCallback((e) => { e.preventDefault(); setDragging(false); processFiles(e.dataTransfer.files); }, [processFiles]);
 
   // ── FDA Login ──────────────────────────────────────────────────────────────
-  const startLogin = async () => {
-    if (!fdaUser || !fdaPass) return;
+ const startLogin = async () => {
+    if (!fdaUser || !fdaPass) {
+      setLoginError("Please enter username and password.");
+      return;
+    }
     setLoginStatus("logging_in");
     setLoginError("");
+    try {
+      const res = await fetch(`${BACKEND}/start-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: SESSION_ID, fdaUsername: fdaUser, fdaPassword: fdaPass }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Server error ${res.status}: ${text}`);
+      }
+      const data = await res.json();
+      if (data.success) {
+        setLoginStatus("awaiting_otp");
+        setShowCreds(false);
+        setShowOTP(true);
+      } else {
+        setLoginStatus("error");
+        setLoginError(data.error || "Login failed — check your credentials.");
+      }
+    } catch (e) {
+      setLoginStatus("error");
+      setLoginError(`Connection error: ${e.message}`);
+    }
+  };
+
     try {
       const res  = await fetch(`${BACKEND}/start-login`, {
         method: "POST",
