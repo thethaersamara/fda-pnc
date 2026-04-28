@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 
-const BACKEND = "https://your-railway-url.railway.app"; // ← we'll update this later
+const BACKEND = "https://fda-pnc-production.up.railway.app";
+
 
 async function parseInvoiceWithClaude(fileBase64, mimeType) {
   const isImage = mimeType.startsWith("image/");
