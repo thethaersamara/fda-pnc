@@ -1,8 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 
 const BACKEND = "https://fda-pnc-production.up.railway.app";
-
-// Generate a unique session ID per user visit
 const SESSION_ID = Math.random().toString(36).slice(2);
 
 async function parseInvoiceWithClaude(fileBase64, mimeType) {
@@ -111,7 +109,7 @@ function OTPModal({ onSubmit, onCancel, loading }) {
         <div style={{ fontSize: 40, marginBottom: 16 }}>📧</div>
         <div style={{ fontSize: 22, fontWeight: 400, marginBottom: 8 }}>Check your email</div>
         <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 14, color: "#9b8f7e", marginBottom: 28, lineHeight: 1.6 }}>
-          FDA sent a one-time password to your email address. Enter it below to continue.
+          FDA sent a one-time password to your email. Enter it below to continue.
         </div>
         <input
           type="text"
@@ -123,11 +121,7 @@ function OTPModal({ onSubmit, onCancel, loading }) {
         />
         <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
           <button onClick={onCancel} style={S.secondaryBtn}>Cancel</button>
-          <button
-            onClick={() => onSubmit(otp)}
-            disabled={!otp || loading}
-            style={S.accentBtn(!otp || loading)}
-          >
+          <button onClick={() => onSubmit(otp)} disabled={!otp || loading} style={S.accentBtn(!otp || loading)}>
             {loading ? "Verifying…" : "Continue"}
           </button>
         </div>
@@ -253,12 +247,10 @@ export default function App() {
   const [parsing,     setParsing]     = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
   const [parseError,  setParseError]  = useState("");
-
-  // FDA auth state
   const [fdaUser,     setFdaUser]     = useState("");
   const [fdaPass,     setFdaPass]     = useState("");
   const [showCreds,   setShowCreds]   = useState(false);
-  const [loginStatus, setLoginStatus] = useState("idle"); // idle | logging_in | awaiting_otp | logged_in | error
+  const [loginStatus, setLoginStatus] = useState("idle");
   const [showOTP,     setShowOTP]     = useState(false);
   const [otpLoading,  setOtpLoading]  = useState(false);
   const [loginError,  setLoginError]  = useState("");
@@ -266,7 +258,6 @@ export default function App() {
   const fileRef  = useRef();
   const loggedIn = loginStatus === "logged_in";
 
-  // ── File handling ──────────────────────────────────────────────────────────
   const toBase64 = (file) => new Promise((res, rej) => {
     const r = new FileReader();
     r.onload = () => res(r.result.split(",")[1]);
@@ -288,10 +279,11 @@ export default function App() {
     setParsing(false);
   }, []);
 
-  const onDrop = useCallback((e) => { e.preventDefault(); setDragging(false); processFiles(e.dataTransfer.files); }, [processFiles]);
+  const onDrop = useCallback((e) => {
+    e.preventDefault(); setDragging(false); processFiles(e.dataTransfer.files);
+  }, [processFiles]);
 
-  // ── FDA Login ──────────────────────────────────────────────────────────────
- const startLogin = async () => {
+  const startLogin = async () => {
     if (!fdaUser || !fdaPass) {
       setLoginError("Please enter username and password.");
       return;
@@ -323,31 +315,10 @@ export default function App() {
     }
   };
 
-    try {
-      const res  = await fetch(`${BACKEND}/start-login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: SESSION_ID, fdaUsername: fdaUser, fdaPassword: fdaPass }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setLoginStatus("awaiting_otp");
-        setShowCreds(false);
-        setShowOTP(true);
-      } else {
-        setLoginStatus("error");
-        setLoginError(data.error || "Login failed");
-      }
-    } catch (e) {
-      setLoginStatus("error");
-      setLoginError(e.message);
-    }
-  };
-
   const submitOTP = async (otp) => {
     setOtpLoading(true);
     try {
-      const res  = await fetch(`${BACKEND}/submit-otp`, {
+      const res = await fetch(`${BACKEND}/submit-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: SESSION_ID, otp }),
@@ -366,13 +337,11 @@ export default function App() {
     }
   };
 
-  // ── Invoice state helpers ──────────────────────────────────────────────────
   const updateInvoice = (idx, data) => setInvoices((prev) => prev.map((inv, i) => i === idx ? data : inv));
-  const removeInvoice = (idx)       => setInvoices((prev) => prev.filter((_, i) => i !== idx));
+  const removeInvoice = (idx) => setInvoices((prev) => prev.filter((_, i) => i !== idx));
   const patchInvoice  = (invoice, patch) =>
     setInvoices((prev) => prev.map((inv) => inv._fileName === invoice._fileName ? { ...inv, ...patch } : inv));
 
-  // ── PNC Submission ─────────────────────────────────────────────────────────
   const submitOne = useCallback(async (invoice) => {
     if (!loggedIn) { setShowCreds(true); return; }
     patchInvoice(invoice, { pncStatus: "submitting", logs: [] });
@@ -419,7 +388,7 @@ export default function App() {
 
   const loginLabel = {
     idle:         "Login to FDA PNC",
-    logging_in:   "Logging in…",
+    logging_in:   "Connecting to FDA…",
     awaiting_otp: "Waiting for OTP…",
     logged_in:    "✓ Logged in to FDA",
     error:        "Login Failed — Retry",
@@ -446,7 +415,7 @@ export default function App() {
             </button>
           )}
           <button
-            onClick={() => loggedIn ? null : setShowCreds(!showCreds)}
+            onClick={() => { if (!loggedIn) setShowCreds(!showCreds); }}
             style={{ ...S.secondaryBtn, background: "#2a2420", color: loggedIn ? "#c8a96e" : loginStatus === "error" ? "#f87171" : "#9b8f7e", border: "1px solid #3a3430" }}
           >
             {loginLabel}
@@ -455,7 +424,6 @@ export default function App() {
       </div>
 
       <div style={S.body}>
-        {/* FDA Login Panel */}
         {showCreds && !loggedIn && (
           <div style={S.card}>
             <div style={S.sectionTitle}>FDA PNC Login</div>
@@ -476,7 +444,7 @@ export default function App() {
                 disabled={!fdaUser || !fdaPass || loginStatus === "logging_in"}
                 style={S.primaryBtn(!fdaUser || !fdaPass || loginStatus === "logging_in")}
               >
-                {loginStatus === "logging_in" ? "Connecting to FDA…" : "Login"}
+                {loginStatus === "logging_in" ? "Connecting…" : "Login"}
               </button>
             </div>
             <div style={{ marginTop: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#9b8f7e" }}>
@@ -485,7 +453,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Upload */}
         <div style={S.card}>
           <div style={S.sectionTitle}>Upload Commercial Invoices</div>
           <div
@@ -507,7 +474,6 @@ export default function App() {
           {parseError && <div style={{ marginTop: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#991b1b" }}>⚠ {parseError}</div>}
         </div>
 
-        {/* Invoice cards */}
         {invoices.map((inv, idx) => (
           <InvoiceCard
             key={idx}
