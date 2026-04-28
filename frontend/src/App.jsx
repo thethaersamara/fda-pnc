@@ -308,10 +308,10 @@ export default function App() {
       } else {
         setLoginStatus("error");
         setLoginError(data.error || "Login failed — check your credentials.");
-      }
-    } catch (e) {
+      }    } catch (e) {
       setLoginStatus("error");
-      setLoginError(`Connection error: ${e.message}`);
+      setLoginError(`Connection error: ${e.message} | Backend: ${BACKEND} | Session: ${SESSION_ID}`);
+    }
     }
   };
 
