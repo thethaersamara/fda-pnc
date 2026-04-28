@@ -476,7 +476,7 @@ export default function App() {
                 disabled={!fdaUser || !fdaPass || loginStatus === "logging_in"}
                 style={S.primaryBtn(!fdaUser || !fdaPass || loginStatus === "logging_in")}
               >
-                {loginStatus === "logging_in" ? "Logging in…" : "Login"}
+                {loginStatus === "logging_in" ? "Connecting to FDA…" : "Login"}
               </button>
             </div>
             <div style={{ marginTop: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#9b8f7e" }}>
