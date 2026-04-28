@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 
-const BACKEND = "https://fda-pnc-production.up.railway.app";
+const BACKEND = "/api";
 const SESSION_ID = Math.random().toString(36).slice(2);
 
 async function parseInvoiceWithClaude(fileBase64, mimeType) {
@@ -308,10 +308,10 @@ export default function App() {
       } else {
         setLoginStatus("error");
         setLoginError(data.error || "Login failed — check your credentials.");
-      }    } catch (e) {
+      }
+    } catch (e) {
       setLoginStatus("error");
-      setLoginError(`Connection error: ${e.message} | Backend: ${BACKEND} | Session: ${SESSION_ID}`);
-    }
+      setLoginError(`Connection error: ${e.message}`);
     }
   };
 
@@ -347,7 +347,7 @@ export default function App() {
     patchInvoice(invoice, { pncStatus: "submitting", logs: [] });
     setSubmitting(true);
     try {
-      const res  = await fetch(`${BACKEND}/submit-pnc`, {
+      const res = await fetch(`${BACKEND}/submit-pnc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: SESSION_ID, invoice }),
@@ -365,7 +365,7 @@ export default function App() {
     setSubmitting(true);
     toSubmit.forEach((inv) => patchInvoice(inv, { pncStatus: "submitting", logs: [] }));
     try {
-      const res  = await fetch(`${BACKEND}/submit-all-pnc`, {
+      const res = await fetch(`${BACKEND}/submit-all-pnc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: SESSION_ID, invoices: toSubmit }),
