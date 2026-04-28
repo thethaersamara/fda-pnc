@@ -9,9 +9,13 @@ const HEADLESS = process.env.HEADLESS !== "false";
 
 app.use(cors({
   origin: "*",
-  methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type"],
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
+
+// Handle preflight requests
+app.options("*", cors());
+
 
 // Store active sessions waiting for OTP
 const sessions = {};
