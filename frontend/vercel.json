@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://fda-pnc-backend.onrender.com/:path*"
+      "destination": "http://68.183.214.84:3001/:path*"
     }
   ]
 }
