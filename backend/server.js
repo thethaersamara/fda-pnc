@@ -47,6 +47,46 @@ app.post("/start-login", async (req, res) => {
   const page    = await (await browser.newContext()).newPage();
 
   try {
+    // Step 1: Load login page and check "I understand"
+    await page.goto("https://www.access.fda.gov/oaa/logonFlow.htm?execution=e2s1", { waitUntil: "networkidle" });
+    await page.check('input[type="checkbox"]').catch(() => {});
+    await page.waitForTimeout(1000);
+    await page.click('button:has-text("Login"), input[type="submit"]');
+    await page.waitForNavigation({ waitUntil: "networkidle" });
+
+    // Step 2: Enter Account ID
+    await safeFill(page, 'input[name="accountId"], input[name="username"], input[type="text"]', fdaUsername);
+    await page.click('button[type="submit"], input[type="submit"], button:has-text("Next"), button:has-text("Login")');
+    await page.waitForNavigation({ waitUntil: "networkidle" });
+
+    // Step 3: Enter Password
+    await safeFill(page, 'input[name="password"], input[type="password"]', fdaPassword);
+    await page.click('button[type="submit"], input[type="submit"], button:has-text("Next"), button:has-text("Login")');
+    await page.waitForNavigation({ waitUntil: "networkidle" });
+
+    // Step 4: Click "Send Code"
+    await page.click('button:has-text("Send Code"), input[type="submit"], button[type="submit"]').catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Save session
+    sessions[sessionId] = { browser, page, status: "awaiting_otp" };
+    res.json({ success: true, status: "awaiting_otp" });
+
+  } catch (err) {
+    await browser.close();
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
+  const { sessionId, fdaUsername, fdaPassword } = req.body;
+  if (!sessionId || !fdaUsername || !fdaPassword)
+    return res.status(400).json({ error: "sessionId, fdaUsername, fdaPassword required" });
+
+  const browser = await chromium.launch({ headless: HEADLESS });
+  const page    = await (await browser.newContext()).newPage();
+
+  try {
     await page.goto("https://www.access.fda.gov/oaa/logonFlow.htm?execution=e2s1", { waitUntil: "networkidle" });
 
 // Check the "I understand" checkbox
