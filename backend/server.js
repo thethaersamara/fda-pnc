@@ -48,10 +48,19 @@ app.post("/start-login", async (req, res) => {
 
   try {
     await page.goto("https://www.access.fda.gov", { waitUntil: "networkidle" });
-    await safeFill(page, '#username, input[name="username"]', fdaUsername);
-    await safeFill(page, '#password, input[name="password"]', fdaPassword);
-    await page.click('button[type="submit"], input[type="submit"]');
-    await page.waitForNavigation({ waitUntil: "networkidle" });
+
+// Click login button on homepage first
+await page.click('a[href*="login"], a:has-text("Login"), a:has-text("Sign In"), button:has-text("Login")').catch(() => {});
+await page.waitForTimeout(2000);
+
+// Fill credentials
+await safeFill(page, '#username, input[name="username"], input[type="text"]', fdaUsername);
+await safeFill(page, '#password, input[name="password"], input[type="password"]', fdaPassword);
+
+// Click submit
+await page.click('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In"), a:has-text("Login")');
+await page.waitForNavigation({ waitUntil: "networkidle" });
+
 
     sessions[sessionId] = { browser, page, status: "awaiting_otp" };
     res.json({ success: true, status: "awaiting_otp" });
