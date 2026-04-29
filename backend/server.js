@@ -47,7 +47,7 @@ app.post("/start-login", async (req, res) => {
   const page    = await (await browser.newContext()).newPage();
 
   try {
-    await page.goto("https://pnc.access.fda.gov/pnc/login", { waitUntil: "networkidle" });
+    await page.goto("https://www.access.fda.gov", { waitUntil: "networkidle" });
     await safeFill(page, '#username, input[name="username"]', fdaUsername);
     await safeFill(page, '#password, input[name="password"]', fdaPassword);
     await page.click('button[type="submit"], input[type="submit"]');
