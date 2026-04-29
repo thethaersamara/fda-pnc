@@ -47,19 +47,25 @@ app.post("/start-login", async (req, res) => {
   const page    = await (await browser.newContext()).newPage();
 
   try {
-    await page.goto("https://www.access.fda.gov", { waitUntil: "networkidle" });
+    await page.goto("https://www.access.fda.gov/oaa/logonFlow.htm?execution=e2s1", { waitUntil: "networkidle" });
 
-// Click login button on homepage first
-await page.click('a[href*="login"], a:has-text("Login"), a:has-text("Sign In"), button:has-text("Login")').catch(() => {});
-await page.waitForTimeout(2000);
+// Check the "I understand" checkbox
+await page.check('input[type="checkbox"]').catch(() => {});
+await page.waitForTimeout(1000);
+
+// Click Login button to proceed to credentials page
+await page.click('button:has-text("Login"), input[type="submit"], a:has-text("Login")');
+await page.waitForNavigation({ waitUntil: "networkidle" });
+await page.waitForTimeout(1000);
 
 // Fill credentials
-await safeFill(page, '#username, input[name="username"], input[type="text"]', fdaUsername);
+await safeFill(page, '#username, input[name="username"], input[name="accountId"], input[type="text"]', fdaUsername);
 await safeFill(page, '#password, input[name="password"], input[type="password"]', fdaPassword);
 
-// Click submit
-await page.click('button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign In"), a:has-text("Login")');
+// Submit credentials
+await page.click('button[type="submit"], input[type="submit"], button:has-text("Login")');
 await page.waitForNavigation({ waitUntil: "networkidle" });
+
 
 
     sessions[sessionId] = { browser, page, status: "awaiting_otp" };
