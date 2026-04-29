@@ -7,6 +7,7 @@ const app      = express();
 const PORT     = process.env.PORT || 3001;
 const HEADLESS = process.env.HEADLESS !== "false";
 
+// Middleware — must come before routes
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({
@@ -15,8 +16,6 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 app.options("*", cors());
-
-
 
 // Store active sessions waiting for OTP
 const sessions = {};
@@ -35,7 +34,10 @@ async function safeSelect(page, selector, value) {
   } catch { }
 }
 
-// ─── ROUTE 1: Start login, wait for OTP ──────────────────────────────────────
+// ─── ROUTE: Health check ──────────────────────────────────────────────────────
+app.get("/health", (_, res) => res.json({ ok: true }));
+
+// ─── ROUTE: Start login ───────────────────────────────────────────────────────
 app.post("/start-login", async (req, res) => {
   const { sessionId, fdaUsername, fdaPassword } = req.body;
   if (!sessionId || !fdaUsername || !fdaPassword)
@@ -51,7 +53,6 @@ app.post("/start-login", async (req, res) => {
     await page.click('button[type="submit"], input[type="submit"]');
     await page.waitForNavigation({ waitUntil: "networkidle" });
 
-    // Save browser + page in memory for this session
     sessions[sessionId] = { browser, page, status: "awaiting_otp" };
     res.json({ success: true, status: "awaiting_otp" });
 
@@ -61,7 +62,7 @@ app.post("/start-login", async (req, res) => {
   }
 });
 
-// ─── ROUTE 2: Submit OTP ──────────────────────────────────────────────────────
+// ─── ROUTE: Submit OTP ────────────────────────────────────────────────────────
 app.post("/submit-otp", async (req, res) => {
   const { sessionId, otp } = req.body;
   if (!sessionId || !otp)
@@ -71,13 +72,10 @@ app.post("/submit-otp", async (req, res) => {
   if (!session)
     return res.status(404).json({ error: "Session not found or expired" });
 
-  const { page } = session;
-
   try {
-    // Fill OTP field
-    await safeFill(page, 'input[name="otp"], input[name="code"], input[type="text"], #otp', otp);
-    await page.click('button[type="submit"], input[type="submit"]');
-    await page.waitForNavigation({ waitUntil: "networkidle" });
+    await safeFill(session.page, 'input[name="otp"], input[name="code"], #otp, input[type="text"]', otp);
+    await session.page.click('button[type="submit"], input[type="submit"]');
+    await session.page.waitForNavigation({ waitUntil: "networkidle" });
 
     session.status = "logged_in";
     res.json({ success: true, status: "logged_in" });
@@ -87,7 +85,7 @@ app.post("/submit-otp", async (req, res) => {
   }
 });
 
-// ─── ROUTE 3: Submit PNC (after login) ───────────────────────────────────────
+// ─── ROUTE: Submit single PNC ─────────────────────────────────────────────────
 app.post("/submit-pnc", async (req, res) => {
   const { sessionId, invoice } = req.body;
   if (!sessionId || !invoice)
@@ -96,7 +94,6 @@ app.post("/submit-pnc", async (req, res) => {
   const session = sessions[sessionId];
   if (!session)
     return res.status(404).json({ error: "Session not found or expired" });
-
   if (session.status !== "logged_in")
     return res.status(400).json({ error: "Not logged in yet" });
 
@@ -114,26 +111,26 @@ app.post("/submit-pnc", async (req, res) => {
 
     log("Filling article information...");
     const item = invoice.items?.[0] || {};
-    await safeFill(page,  '#articleDescription, input[name="articleDescription"]', item.description || "");
-    await safeFill(page,  '#quantity, input[name="quantity"]', String(item.quantity || 1));
-    await safeSelect(page,'#quantityUOM, select[name="quantityUOM"]', item.quantityUnit || "EACH");
-    await safeFill(page,  '#harmonizedCode, input[name="hsCode"]', item.hsCode || "");
-    await safeSelect(page,'#countryOfOrigin, select[name="countryOfOrigin"]', item.countryOfOrigin || invoice.originCountry || "");
-    await safeFill(page,  '#manufacturerName, input[name="manufacturerName"]', invoice.shipper?.name || "");
+    await safeFill(page,   '#articleDescription, input[name="articleDescription"]', item.description || "");
+    await safeFill(page,   '#quantity, input[name="quantity"]', String(item.quantity || 1));
+    await safeSelect(page, '#quantityUOM, select[name="quantityUOM"]', item.quantityUnit || "EACH");
+    await safeFill(page,   '#harmonizedCode, input[name="hsCode"]', item.hsCode || "");
+    await safeSelect(page, '#countryOfOrigin, select[name="countryOfOrigin"]', item.countryOfOrigin || invoice.originCountry || "");
+    await safeFill(page,   '#manufacturerName, input[name="manufacturerName"]', invoice.shipper?.name || "");
 
     log("Filling shipper information...");
-    await safeFill(page,  '#shipperName, input[name="shipperName"]', invoice.shipper?.name || "");
-    await safeFill(page,  '#shipperAddress, input[name="shipperAddress"]', invoice.shipper?.address || "");
-    await safeFill(page,  '#shipperCity, input[name="shipperCity"]', invoice.shipper?.city || "");
-    await safeFill(page,  '#shipperZip, input[name="shipperZip"]', invoice.shipper?.zip || "");
-    await safeSelect(page,'#shipperCountry, select[name="shipperCountry"]', invoice.shipper?.country || "");
+    await safeFill(page,   '#shipperName, input[name="shipperName"]', invoice.shipper?.name || "");
+    await safeFill(page,   '#shipperAddress, input[name="shipperAddress"]', invoice.shipper?.address || "");
+    await safeFill(page,   '#shipperCity, input[name="shipperCity"]', invoice.shipper?.city || "");
+    await safeFill(page,   '#shipperZip, input[name="shipperZip"]', invoice.shipper?.zip || "");
+    await safeSelect(page, '#shipperCountry, select[name="shipperCountry"]', invoice.shipper?.country || "");
 
     log("Filling consignee information...");
-    await safeFill(page,  '#consigneeName, input[name="consigneeName"]', invoice.consignee?.name || "");
-    await safeFill(page,  '#consigneeAddress, input[name="consigneeAddress"]', invoice.consignee?.address || "");
-    await safeFill(page,  '#consigneeCity, input[name="consigneeCity"]', invoice.consignee?.city || "");
-    await safeFill(page,  '#consigneeZip, input[name="consigneeZip"]', invoice.consignee?.zip || "");
-    await safeSelect(page,'#consigneeCountry, select[name="consigneeCountry"]', invoice.consignee?.country || "US");
+    await safeFill(page,   '#consigneeName, input[name="consigneeName"]', invoice.consignee?.name || "");
+    await safeFill(page,   '#consigneeAddress, input[name="consigneeAddress"]', invoice.consignee?.address || "");
+    await safeFill(page,   '#consigneeCity, input[name="consigneeCity"]', invoice.consignee?.city || "");
+    await safeFill(page,   '#consigneeZip, input[name="consigneeZip"]', invoice.consignee?.zip || "");
+    await safeSelect(page, '#consigneeCountry, select[name="consigneeCountry"]', invoice.consignee?.country || "US");
 
     log("Filling transport information...");
     await safeFill(page, '#carrier, input[name="carrier"]', "FedEx");
@@ -152,7 +149,6 @@ app.post("/submit-pnc", async (req, res) => {
     const confirmationNumber = match?.[1] || "Submitted — check PNC portal";
     log(`✅ PNC# ${confirmationNumber}`);
 
-    // Clean up session
     delete sessions[sessionId];
     await browser.close();
 
@@ -164,7 +160,7 @@ app.post("/submit-pnc", async (req, res) => {
   }
 });
 
-// ─── ROUTE 4: Submit all PNCs in one session ──────────────────────────────────
+// ─── ROUTE: Submit all PNCs ───────────────────────────────────────────────────
 app.post("/submit-all-pnc", async (req, res) => {
   const { sessionId, invoices } = req.body;
   if (!sessionId || !invoices?.length)
@@ -173,7 +169,6 @@ app.post("/submit-all-pnc", async (req, res) => {
   const session = sessions[sessionId];
   if (!session)
     return res.status(404).json({ error: "Session not found or expired" });
-
   if (session.status !== "logged_in")
     return res.status(400).json({ error: "Not logged in yet" });
 
@@ -193,23 +188,23 @@ app.post("/submit-all-pnc", async (req, res) => {
       await page.waitForNavigation({ waitUntil: "networkidle" });
 
       const item = invoice.items?.[0] || {};
-      await safeFill(page,  '#articleDescription, input[name="articleDescription"]', item.description || "");
-      await safeFill(page,  '#quantity, input[name="quantity"]', String(item.quantity || 1));
-      await safeSelect(page,'#quantityUOM, select[name="quantityUOM"]', item.quantityUnit || "EACH");
-      await safeFill(page,  '#harmonizedCode, input[name="hsCode"]', item.hsCode || "");
-      await safeSelect(page,'#countryOfOrigin, select[name="countryOfOrigin"]', item.countryOfOrigin || "");
-      await safeFill(page,  '#shipperName, input[name="shipperName"]', invoice.shipper?.name || "");
-      await safeFill(page,  '#shipperAddress, input[name="shipperAddress"]', invoice.shipper?.address || "");
-      await safeFill(page,  '#shipperCity, input[name="shipperCity"]', invoice.shipper?.city || "");
-      await safeSelect(page,'#shipperCountry, select[name="shipperCountry"]', invoice.shipper?.country || "");
-      await safeFill(page,  '#consigneeName, input[name="consigneeName"]', invoice.consignee?.name || "");
-      await safeFill(page,  '#consigneeAddress, input[name="consigneeAddress"]', invoice.consignee?.address || "");
-      await safeFill(page,  '#consigneeCity, input[name="consigneeCity"]', invoice.consignee?.city || "");
-      await safeSelect(page,'#consigneeCountry, select[name="consigneeCountry"]', invoice.consignee?.country || "US");
-      await safeFill(page,  '#carrier, input[name="carrier"]', "FedEx");
-      await safeFill(page,  '#billOfLading, input[name="trackingNumber"]', invoice.trackingNumber || "");
+      await safeFill(page,   '#articleDescription, input[name="articleDescription"]', item.description || "");
+      await safeFill(page,   '#quantity, input[name="quantity"]', String(item.quantity || 1));
+      await safeSelect(page, '#quantityUOM, select[name="quantityUOM"]', item.quantityUnit || "EACH");
+      await safeFill(page,   '#harmonizedCode, input[name="hsCode"]', item.hsCode || "");
+      await safeSelect(page, '#countryOfOrigin, select[name="countryOfOrigin"]', item.countryOfOrigin || "");
+      await safeFill(page,   '#shipperName, input[name="shipperName"]', invoice.shipper?.name || "");
+      await safeFill(page,   '#shipperAddress, input[name="shipperAddress"]', invoice.shipper?.address || "");
+      await safeFill(page,   '#shipperCity, input[name="shipperCity"]', invoice.shipper?.city || "");
+      await safeSelect(page, '#shipperCountry, select[name="shipperCountry"]', invoice.shipper?.country || "");
+      await safeFill(page,   '#consigneeName, input[name="consigneeName"]', invoice.consignee?.name || "");
+      await safeFill(page,   '#consigneeAddress, input[name="consigneeAddress"]', invoice.consignee?.address || "");
+      await safeFill(page,   '#consigneeCity, input[name="consigneeCity"]', invoice.consignee?.city || "");
+      await safeSelect(page, '#consigneeCountry, select[name="consigneeCountry"]', invoice.consignee?.country || "US");
+      await safeFill(page,   '#carrier, input[name="carrier"]', "FedEx");
+      await safeFill(page,   '#billOfLading, input[name="trackingNumber"]', invoice.trackingNumber || "");
       const arrivalDate = invoice.estimatedArrival || new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0];
-      await safeFill(page,  'input[type="date"][name*="arrival"], #arrivalDate', arrivalDate);
+      await safeFill(page,   'input[type="date"][name*="arrival"], #arrivalDate', arrivalDate);
 
       await page.click('button[type="submit"]:has-text("Submit"), input[type="submit"]');
       await page.waitForNavigation({ waitUntil: "networkidle" });
@@ -226,12 +221,9 @@ app.post("/submit-all-pnc", async (req, res) => {
     }
   }
 
-  // Clean up
   delete sessions[sessionId];
   await session.browser.close();
-
   res.json({ results });
 });
 
-app.get("/health", (_, res) => res.json({ ok: true }));
 app.listen(PORT, () => console.log(`🚀 http://localhost:${PORT}`));
