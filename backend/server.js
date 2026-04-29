@@ -7,7 +7,6 @@ const app      = express();
 const PORT     = process.env.PORT || 3001;
 const HEADLESS = process.env.HEADLESS !== "false";
 
-// Middleware — must come before routes
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({
@@ -17,7 +16,6 @@ app.use(cors({
 }));
 app.options("*", cors());
 
-// Store active sessions waiting for OTP
 const sessions = {};
 
 async function safeFill(page, selector, value) {
@@ -34,10 +32,8 @@ async function safeSelect(page, selector, value) {
   } catch { }
 }
 
-// ─── ROUTE: Health check ──────────────────────────────────────────────────────
 app.get("/health", (_, res) => res.json({ ok: true }));
 
-// ─── ROUTE: Start login ───────────────────────────────────────────────────────
 app.post("/start-login", async (req, res) => {
   const { sessionId, fdaUsername, fdaPassword } = req.body;
   if (!sessionId || !fdaUsername || !fdaPassword)
@@ -68,7 +64,6 @@ app.post("/start-login", async (req, res) => {
     await page.click('button:has-text("Send Code"), input[type="submit"], button[type="submit"]').catch(() => {});
     await page.waitForTimeout(2000);
 
-    // Save session
     sessions[sessionId] = { browser, page, status: "awaiting_otp" };
     res.json({ success: true, status: "awaiting_otp" });
 
@@ -78,46 +73,6 @@ app.post("/start-login", async (req, res) => {
   }
 });
 
-
-  const { sessionId, fdaUsername, fdaPassword } = req.body;
-  if (!sessionId || !fdaUsername || !fdaPassword)
-    return res.status(400).json({ error: "sessionId, fdaUsername, fdaPassword required" });
-
-  const browser = await chromium.launch({ headless: HEADLESS });
-  const page    = await (await browser.newContext()).newPage();
-
-  try {
-    await page.goto("https://www.access.fda.gov/oaa/logonFlow.htm?execution=e2s1", { waitUntil: "networkidle" });
-
-// Check the "I understand" checkbox
-await page.check('input[type="checkbox"]').catch(() => {});
-await page.waitForTimeout(1000);
-
-// Click Login button to proceed to credentials page
-await page.click('button:has-text("Login"), input[type="submit"], a:has-text("Login")');
-await page.waitForNavigation({ waitUntil: "networkidle" });
-await page.waitForTimeout(1000);
-
-// Fill credentials
-await safeFill(page, '#username, input[name="username"], input[name="accountId"], input[type="text"]', fdaUsername);
-await safeFill(page, '#password, input[name="password"], input[type="password"]', fdaPassword);
-
-// Submit credentials
-await page.click('button[type="submit"], input[type="submit"], button:has-text("Login")');
-await page.waitForNavigation({ waitUntil: "networkidle" });
-
-
-
-    sessions[sessionId] = { browser, page, status: "awaiting_otp" };
-    res.json({ success: true, status: "awaiting_otp" });
-
-  } catch (err) {
-    await browser.close();
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ─── ROUTE: Submit OTP ────────────────────────────────────────────────────────
 app.post("/submit-otp", async (req, res) => {
   const { sessionId, otp } = req.body;
   if (!sessionId || !otp)
@@ -128,8 +83,8 @@ app.post("/submit-otp", async (req, res) => {
     return res.status(404).json({ error: "Session not found or expired" });
 
   try {
-    await safeFill(session.page, 'input[name="otp"], input[name="code"], #otp, input[type="text"]', otp);
-    await session.page.click('button[type="submit"], input[type="submit"]');
+    await safeFill(session.page, 'input[name="otp"], input[name="code"], input[name="verificationCode"], #otp, input[type="text"]', otp);
+    await session.page.click('button[type="submit"], input[type="submit"], button:has-text("Verify"), button:has-text("Submit")');
     await session.page.waitForNavigation({ waitUntil: "networkidle" });
 
     session.status = "logged_in";
@@ -140,7 +95,6 @@ app.post("/submit-otp", async (req, res) => {
   }
 });
 
-// ─── ROUTE: Submit single PNC ─────────────────────────────────────────────────
 app.post("/submit-pnc", async (req, res) => {
   const { sessionId, invoice } = req.body;
   if (!sessionId || !invoice)
@@ -159,10 +113,16 @@ app.post("/submit-pnc", async (req, res) => {
   try {
     log("Opening new Prior Notice...");
     await page.click([
-      'a[href*="create"]', 'a[href*="newPriorNotice"]',
-      'button:has-text("New")', 'a:has-text("Create Prior Notice")',
+      'button:has-text("Create New Prior Notice")',
+      'a:has-text("Create New Prior Notice")',
+      'button:has-text("Create New")',
+      'a:has-text("Create")',
     ].join(", "));
     await page.waitForNavigation({ waitUntil: "networkidle" });
+
+    log("Selecting shipment type...");
+    await page.click('button:has-text("Consumption"), a:has-text("Consumption")').catch(() => {});
+    await page.waitForTimeout(1000);
 
     log("Filling article information...");
     const item = invoice.items?.[0] || {};
@@ -195,11 +155,11 @@ app.post("/submit-pnc", async (req, res) => {
     await safeFill(page, '#portOfEntry, input[name="portOfEntry"]', invoice.portOfEntry || "");
 
     log("Submitting...");
-    await page.click('button[type="submit"]:has-text("Submit"), input[type="submit"]');
+    await page.click('button:has-text("Submit to FDA"), button[type="submit"]:has-text("Submit"), input[type="submit"]');
     await page.waitForNavigation({ waitUntil: "networkidle" });
 
     const body  = await page.textContent("body");
-    const match = body.match(/Prior Notice (?:Number|#)[:\s]+([A-Z0-9\-]+)/i)
+    const match = body.match(/Prior Notice (?:Number|#|Confirmation)[:\s]+([A-Z0-9\-]+)/i)
       || body.match(/Confirmation[:\s#]+([A-Z0-9\-]+)/i);
     const confirmationNumber = match?.[1] || "Submitted — check PNC portal";
     log(`✅ PNC# ${confirmationNumber}`);
@@ -215,7 +175,6 @@ app.post("/submit-pnc", async (req, res) => {
   }
 });
 
-// ─── ROUTE: Submit all PNCs ───────────────────────────────────────────────────
 app.post("/submit-all-pnc", async (req, res) => {
   const { sessionId, invoices } = req.body;
   if (!sessionId || !invoices?.length)
@@ -237,10 +196,14 @@ app.post("/submit-all-pnc", async (req, res) => {
     try {
       log("Opening new Prior Notice...");
       await page.click([
-        'a[href*="create"]', 'a[href*="newPriorNotice"]',
-        'button:has-text("New")', 'a:has-text("Create Prior Notice")',
+        'button:has-text("Create New Prior Notice")',
+        'a:has-text("Create New Prior Notice")',
+        'button:has-text("Create New")',
       ].join(", "));
       await page.waitForNavigation({ waitUntil: "networkidle" });
+
+      await page.click('button:has-text("Consumption"), a:has-text("Consumption")').catch(() => {});
+      await page.waitForTimeout(1000);
 
       const item = invoice.items?.[0] || {};
       await safeFill(page,   '#articleDescription, input[name="articleDescription"]', item.description || "");
@@ -261,11 +224,11 @@ app.post("/submit-all-pnc", async (req, res) => {
       const arrivalDate = invoice.estimatedArrival || new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0];
       await safeFill(page,   'input[type="date"][name*="arrival"], #arrivalDate', arrivalDate);
 
-      await page.click('button[type="submit"]:has-text("Submit"), input[type="submit"]');
+      await page.click('button:has-text("Submit to FDA"), button[type="submit"]:has-text("Submit"), input[type="submit"]');
       await page.waitForNavigation({ waitUntil: "networkidle" });
 
       const body  = await page.textContent("body");
-      const match = body.match(/Prior Notice (?:Number|#)[:\s]+([A-Z0-9\-]+)/i);
+      const match = body.match(/Prior Notice (?:Number|#|Confirmation)[:\s]+([A-Z0-9\-]+)/i);
       const confirmationNumber = match?.[1] || "Submitted";
       log(`✅ PNC# ${confirmationNumber}`);
       results.push({ invoiceNumber: invoice.invoiceNumber, success: true, confirmationNumber, logs });
