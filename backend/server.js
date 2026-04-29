@@ -7,14 +7,15 @@ const app      = express();
 const PORT     = process.env.PORT || 3001;
 const HEADLESS = process.env.HEADLESS !== "false";
 
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
-
-// Handle preflight requests
 app.options("*", cors());
+
 
 
 // Store active sessions waiting for OTP
