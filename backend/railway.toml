@@ -1,0 +1,8 @@
+[build]
+builder = "nixpacks"
+
+[build.nixpacksPlan.phases.setup]
+nixPkgs = ["chromium", "nss", "nspr", "atk", "cups", "dbus", "expat", "libdrm", "libxkbcommon", "mesa", "libxcomposite", "libxdamage", "libxfixes", "libxrandr", "gbm", "pango", "cairo", "alsa-lib"]
+
+[deploy]
+startCommand = "npx playwright install chromium && node server.js"
