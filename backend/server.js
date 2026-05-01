@@ -1,7 +1,10 @@
 require("dotenv").config();
 const express      = require("express");
 const cors         = require("cors");
-const { chromium } = require("playwright");
+const { chromium } = require("playwright-extra");
+const StealthPlugin = require("playwright-extra-plugin-stealth");
+chromium.use(StealthPlugin());
+
 
 const app      = express();
 const PORT     = process.env.PORT || 3001;
