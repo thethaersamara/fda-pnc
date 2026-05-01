@@ -39,15 +39,21 @@ app.post("/start-login", async (req, res) => {
   const page    = await (await browser.newContext()).newPage();
 
   try {
-    await page.goto(https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
+       await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(2000);
 
-    await page.check('input[type="checkbox"]').catch(() => {});
-    await page.waitForTimeout(1000);
-
-    await page.click('button.btn, button[type="button"], button');
+    // Step 1: Click Log-In on homepage
+    await page.click('button:has-text("Log-In"), a:has-text("Log-In")');
     await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(2000);
+
+    // Step 2: Check "I understand" and click Login
+    await page.check('input[type="checkbox"]').catch(() => {});
+    await page.waitForTimeout(1000);
+    await page.click('button:has-text("Login"), input[type="submit"]');
+    await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.waitForTimeout(2000);
+
 
     await safeFill(page, 'input[name="accountId"], input[name="username"], input[type="text"]', fdaUsername);
     await page.waitForTimeout(500);
