@@ -5,7 +5,7 @@ const { chromium } = require("playwright");
 
 const app      = express();
 const PORT     = process.env.PORT || 3001;
-const HEADLESS = process.env.HEADLESS !== "false";
+const HEADLESS = process.env.HEADLESS !== "false";  
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -42,17 +42,18 @@ app.post("/start-login", async (req, res) => {
        await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(2000);
 
-    // Step 1: Click Log-In on homepage
-    await page.click('button:has-text("Log"), a:has-text("Log")');
+       // Step 1: Click Log-In on homepage
+    await page.locator('button').first().click();
     await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(2000);
 
     // Step 2: Check "I understand" and click Login
     await page.check('input[type="checkbox"]').catch(() => {});
     await page.waitForTimeout(1000);
-    await page.click('button:has-text("Login"), input[type="submit"]');
+    await page.locator('button').first().click();
     await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(2000);
+
 
 
     await safeFill(page, 'input[name="accountId"], input[name="username"], input[type="text"]', fdaUsername);
