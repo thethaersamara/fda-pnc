@@ -1,9 +1,17 @@
 require("dotenv").config();
 const express      = require("express");
 const cors         = require("cors");
-const { chromium } = require("playwright-extra");
-const StealthPlugin = require("playwright-extra-plugin-stealth");
-chromium.use(StealthPlugin());
+const { chromium } = require("playwright");
+
+const BROWSER_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-blink-features=AutomationControlled',
+  '--disable-infobars',
+  '--window-size=1920,1080',
+  '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+];
+
 
 
 const app      = express();
