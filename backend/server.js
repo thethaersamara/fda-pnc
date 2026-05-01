@@ -43,7 +43,7 @@ app.post("/start-login", async (req, res) => {
     await page.waitForTimeout(2000);
 
     // Step 1: Click Log-In on homepage
-    await page.click('button:has-text("Log-In"), a:has-text("Log-In")');
+    await page.click('button:has-text("Log"), a:has-text("Log")');
     await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(2000);
 
