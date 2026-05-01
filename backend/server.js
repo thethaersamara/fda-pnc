@@ -39,7 +39,7 @@ app.post("/start-login", async (req, res) => {
   const page    = await (await browser.newContext()).newPage();
 
   try {
-    await page.goto("https://www.access.fda.gov/oaa/logonFlow.htm?execution=e2s1", { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto(https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(2000);
 
     await page.check('input[type="checkbox"]').catch(() => {});
