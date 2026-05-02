@@ -46,19 +46,24 @@ app.post("/start-login", async (req, res) => {
   if (!sessionId || !fdaUsername || !fdaPassword)
     return res.status(400).json({ error: "sessionId, fdaUsername, fdaPassword required" });
 
-  const browser = await chromium.launch({ headless: HEADLESS, args: BROWSER_ARGS });
+const browser = await chromium.launch({
+  headless: HEADLESS,
+  args: BROWSER_ARGS,
+  proxy: {
+    server: "http://geo.g-w.info:10080",
+    username: "user-A1tNdIJLlFjSFqtw-type-residential-session-6cs9ijsq-country-us-city-New_York-rotation-15",
+    password: "rcAjK3TXywhRyyGn",
+  },
+});
 const context = await browser.newContext({
   userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   viewport: { width: 1920, height: 1080 },
-  extraHTTPHeaders: {
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-  },
 });
 const page = await context.newPage();
 await page.addInitScript(() => {
   Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
 });
+
 
 
   try {
