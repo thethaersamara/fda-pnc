@@ -50,8 +50,8 @@ const browser = await chromium.launch({
   headless: HEADLESS,
   args: BROWSER_ARGS,
   proxy: {
-    server: "http://geo.g-w.info:10080",
-    username: "user-A1tNdIJLlFjSFqtw-type-residential-session-6cs9ijsq-country-us-city-New_York-rotation-15",
+    server: "https://geo.g-w.info:10443",
+    username: "user-A1tNdIJLlFjSFqtw-type-residential-session-mxfe6dov-country-us-state-newyork-rotation-15",
     password: "rcAjK3TXywhRyyGn",
   },
 });
