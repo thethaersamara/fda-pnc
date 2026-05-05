@@ -39,6 +39,11 @@ async function safeSelect(page, selector, value) {
   } catch { }
 }
 
+app.use((req, res, next) => {
+  req.headers["ngrok-skip-browser-warning"] = "true";
+  next();
+});
+
 app.get("/health", (_, res) => res.json({ ok: true }));
 
 app.post("/start-login", async (req, res) => {
