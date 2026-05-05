@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://nutcase-anyway-unsterile.ngrok-free.dev/:path*"
+      "destination": "https://6db6d33313e13f6b-94-73-20-63.serveousercontent.com/:path*"
     }
   ]
 }
