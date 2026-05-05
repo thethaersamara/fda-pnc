@@ -67,7 +67,7 @@ await page.addInitScript(() => {
 
 
   try {
-           await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
+         await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(3000);
 
     // Step 1: Click Log-In on homepage
@@ -76,8 +76,7 @@ await page.addInitScript(() => {
       const loginBtn = btns.find(b => b.textContent.toLowerCase().includes('log'));
       if (loginBtn) loginBtn.click();
     });
-    await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(5000);
 
     // Step 2: Check "I understand" and click Login
     await page.check('input[type="checkbox"]').catch(() => {});
@@ -87,8 +86,9 @@ await page.addInitScript(() => {
       const loginBtn = btns.find(b => b.textContent.toLowerCase().includes('login') || b.textContent.toLowerCase().includes('log in'));
       if (loginBtn) loginBtn.click();
     });
-    await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(5000);
+
+
 
 
 
