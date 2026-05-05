@@ -93,20 +93,30 @@ await page.addInitScript(() => {
 
 
 
-    await safeFill(page, 'input[name="accountId"], input[name="username"], input[type="text"]', fdaUsername);
-    await page.waitForTimeout(500);
-    await page.click('button[type="submit"], input[type="submit"], button');
-    await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForTimeout(2000);
+        await safeFill(page, 'input[name="accountId"], input[name="username"], input[type="text"]', fdaUsername);
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => {
+      const btn = document.querySelector('button[type="submit"], input[type="submit"], button');
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
 
     await safeFill(page, 'input[name="password"], input[type="password"]', fdaPassword);
-    await page.waitForTimeout(500);
-    await page.click('button[type="submit"], input[type="submit"], button');
-    await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => {
+      const btn = document.querySelector('button[type="submit"], input[type="submit"], button');
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
 
-    await page.click('button:has-text("Send Code"), button[type="submit"], button').catch(() => {});
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+      const sendBtn = btns.find(b => b.textContent.toLowerCase().includes('send'));
+      if (sendBtn) sendBtn.click();
+      else if (btns[0]) btns[0].click();
+    }).catch(() => {});
     await page.waitForTimeout(3000);
+
 
     sessions[sessionId] = { browser, page, status: "awaiting_otp" };
     res.json({ success: true, status: "awaiting_otp" });
