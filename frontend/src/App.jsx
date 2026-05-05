@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 
-const BACKEND = "/api";
+const BACKEND = "http://192.168.1.111:3001";
+
 
 const SESSION_ID = Math.random().toString(36).slice(2);
 
