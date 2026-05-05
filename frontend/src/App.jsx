@@ -291,11 +291,15 @@ export default function App() {
     setLoginStatus("logging_in");
     setLoginError("");
     try {
-      const res = await fetch(`${BACKEND}/start-login`, {
+            const res = await fetch(`${BACKEND}/start-login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
         body: JSON.stringify({ sessionId: SESSION_ID, fdaUsername: fdaUser, fdaPassword: fdaPass }),
       });
+
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`Server error ${res.status}: ${text}`);
