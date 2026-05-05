@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 
-const BACKEND = "/api";
+const BACKEND = "https://6db6d33313e13f6b-94-73-20-63.serveousercontent.com";
+
 const SESSION_ID = Math.random().toString(36).slice(2);
 
 async function parseInvoiceWithClaude(fileBase64, mimeType) {
