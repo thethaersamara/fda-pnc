@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 
-const BACKEND = "/api";
+const BACKEND = "https://nutcase-anyway-unsterile.ngrok-free.dev";
 const SESSION_ID = Math.random().toString(36).slice(2);
 
 async function parseInvoiceWithClaude(fileBase64, mimeType) {
