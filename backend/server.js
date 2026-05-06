@@ -79,25 +79,34 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-                 // Step 4: Enter Password and click Next
+        // Step 4: Enter Password and click Next
     await page.waitForTimeout(3000);
-    // Click somewhere on the page first to ensure focus
-    await page.mouse.click(640, 400);
-    await page.waitForTimeout(500);
-    // Tab to find the password field and type
-    await page.keyboard.press('Tab');
-    await page.waitForTimeout(300);
-    await page.keyboard.press('Tab');
-    await page.waitForTimeout(300);
-    // Try clicking the password field area and typing
-    await page.evaluate((pwd) => {
-      const all = Array.from(document.querySelectorAll('input'));
-      console.log('All inputs:', all.map(i => `${i.type}|${i.id}|${i.name}|${i.className}`).join(', '));
+    const allInputs = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('input'))
+        .map(i => `${i.type}|${i.id}|${i.name}|${i.className}`);
+    });
+    console.log("All inputs on password page:", JSON.stringify(allInputs));
+
+    // Type password into whichever input is visible
+    const typed = await page.evaluate((pwd) => {
+      const inputs = Array.from(document.querySelectorAll('input'));
+      for (const input of inputs) {
+        const rect = input.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          input.focus();
+          input.value = pwd;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          return `Typed into: ${input.type}|${input.id}|${input.name}`;
+        }
+      }
+      return 'No visible input found';
     }, fdaPassword);
-    await page.keyboard.type(fdaPassword, { delay: 100 });
+    console.log("Password typing result:", typed);
+
     await page.waitForTimeout(500);
     await page.keyboard.press('Enter');
-    console.log("Typed password and pressed Enter, waiting for Send Code popup...");
+    console.log("Pressed Enter, waiting for Send Code popup...");
     await page.waitForTimeout(5000);
 
 
