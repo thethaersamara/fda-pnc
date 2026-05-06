@@ -3,7 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const { chromium } = require("playwright-core"); 
 
-const app = express();
+const app = express(); 
 const PORT = process.env.PORT || 3001;
 const BB_KEY = process.env.BROWSERBASE_API_KEY || "bb_live_ObfYaIPxJbYfxQ_e1IMbsmwuluE";
 const BB_PROJECT = process.env.BROWSERBASE_PROJECT_ID || "529bb6fc-5478-4648-b83c-e9eb4531a1fb";
@@ -88,11 +88,21 @@ app.post("/start-login", async (req, res) => {
     console.log("All inputs on password page:", JSON.stringify(allInputs));
 
     // Type password into whichever input is visible
-    const typed = await page.evaluate((pwd) => {
+       const typed = await page.evaluate((pwd) => {
       const inputs = Array.from(document.querySelectorAll('input'));
-      for (const input of inputs) {
-        const rect = input.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
+      // Target password field specifically
+      const pwdInput = inputs.find(i => i.type === 'password') || 
+                       inputs.find(i => i.getBoundingClientRect().width > 0);
+      if (pwdInput) {
+        pwdInput.focus();
+        pwdInput.value = pwd;
+        pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
+        pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
+        return `Typed into: ${pwdInput.type}|${pwdInput.id}`;
+      }
+      return 'No input found';
+    }, fdaPassword);
+
           input.focus();
           input.value = pwd;
           input.dispatchEvent(new Event('input', { bubbles: true }));
