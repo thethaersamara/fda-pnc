@@ -79,19 +79,33 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-        // Step 4: Enter Password and click Next
-    await page.evaluate((pwd) => {
-      const inputs = document.querySelectorAll('input[type="password"], input[type="text"]');
-      if (inputs.length > 0) inputs[inputs.length - 1].value = pwd;
-    }, fdaPassword).catch(() => {});
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
-      const btn = btns.find(b => (b.textContent || b.value || '').toLowerCase().includes('next') || 
-                                  (b.textContent || b.value || '').toLowerCase().includes('submit') ||
-                                  (b.textContent || b.value || '').toLowerCase().includes('sign in'));
-      if (btn) btn.click();
-    }).catch(() => {});
-    console.log("Clicked Next after password, waiting for Send Code popup...");
+            // Step 4: Enter Password and click Next
+    await page.waitForTimeout(2000);
+    const pwdField = await page.$('input[type="password"]');
+    if (pwdField) {
+      await pwdField.click({ clickCount: 3 });
+      await pwdField.type(fdaPassword, { delay: 50 });
+      console.log("Typed password into field");
+    } else {
+      console.log("Password field NOT found");
+    }
+    await page.waitForTimeout(1000);
+    const nextBtn = await page.$('button[type="submit"], input[type="submit"]');
+    if (nextBtn) {
+      await nextBtn.click();
+      console.log("Clicked Next button");
+    } else {
+      // fallback: find by text
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+        const btn = btns.find(b => (b.textContent || b.value || '').trim().toLowerCase() === 'next');
+        if (btn) btn.click();
+      });
+      console.log("Clicked Next via fallback");
+    }
+    console.log("Waiting for Send Code popup...");
+    await page.waitForTimeout(5000);
+
     
     // Step 5: Wait for Send Code popup to appear
     await page.waitForTimeout(5000);
