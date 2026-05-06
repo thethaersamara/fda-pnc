@@ -44,13 +44,8 @@ app.post("/start-login", async (req, res) => {
   if (!sessionId || !fdaUsername || !fdaPassword)
     return res.status(400).json({ error: "sessionId, fdaUsername, fdaPassword required" });
 
-    // Respond immediately, run login in background
-  res.json({ success: true, status: "awaiting_otp" });
-  sessions[sessionId] = { status: "logging_in" };
-
-  try {
+     try {
     const { browser } = await createBrowser();
-
 
     await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(3000);
@@ -134,6 +129,7 @@ app.post("/start-login", async (req, res) => {
     console.log("Page after Send Code:", pageText.substring(0, 200));
 
     sessions[sessionId] = { browser, page, status: "awaiting_otp" };
+    res.json({ success: true, status: "awaiting_otp" });
 
 
   } catch (err) {
