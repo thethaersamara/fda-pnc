@@ -131,7 +131,6 @@ app.post("/start-login", async (req, res) => {
     sessions[sessionId] = { browser, page, status: "awaiting_otp" };
     res.json({ success: true, status: "awaiting_otp" });
 
-
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
