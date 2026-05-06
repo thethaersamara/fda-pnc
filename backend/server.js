@@ -1,13 +1,12 @@
 require("dotenv").config();
 const express = require("express");
-const cors    = require("cors");
-const { chromium } = require("playwright-core"); 
+const cors = require("cors");
+const { chromium } = require("playwright-core");
 
-const app      = express(); 
-const PORT     = process.env.PORT || 3001;
-const BB_KEY   = process.env.BROWSERBASE_API_KEY || "bb_live_ObfYaIPxJbYfxQ_e1IMbsmwuluE";
+const app = express();
+const PORT = process.env.PORT || 3001;
+const BB_KEY = process.env.BROWSERBASE_API_KEY || "bb_live_ObfYaIPxJbYfxQ_e1IMbsmwuluE";
 const BB_PROJECT = process.env.BROWSERBASE_PROJECT_ID || "529bb6fc-5478-4648-b83c-e9eb4531a1fb";
-
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -16,18 +15,9 @@ app.options("*", cors());
 
 const sessions = {};
 
-async function safeFill(page, selector, value) { 
+async function safeFill(page, selector, value) {
   if (!value) return;
   try { await page.fill(selector, String(value)); } catch { }
-}
-
-async function safeSelect(page, selector, value) {
-  if (!value) return;
-  try {
-    await page.selectOption(selector, { value }).catch(() =>
-      page.selectOption(selector, { label: String(value) })
-    );
-  } catch { }
 }
 
 async function createBrowser() {
@@ -42,13 +32,9 @@ async function createBrowser() {
   const bbSession = await response.json();
   console.log("Browserbase session created:", bbSession.id);
   if (!bbSession.id) throw new Error("Failed to create Browserbase session: " + JSON.stringify(bbSession));
-  
   const connectUrl = bbSession.connectUrl || `wss://connect.browserbase.com?apiKey=${BB_KEY}&sessionId=${bbSession.id}`;
-  console.log("Connecting to:", connectUrl.substring(0, 50));
-  
   const browser = await chromium.connectOverCDP(connectUrl);
   return { browser };
-
 }
 
 app.get("/health", (_, res) => res.json({ ok: true }));
@@ -59,31 +45,32 @@ app.post("/start-login", async (req, res) => {
     return res.status(400).json({ error: "sessionId, fdaUsername, fdaPassword required" });
 
   try {
-        const { browser } = await createBrowser();
+    const { browser } = await createBrowser();
     const contexts = browser.contexts();
     const context = contexts.length > 0 ? contexts[0] : await browser.newContext();
-    const page    = await context.newPage();
+    const page = await context.newPage();
 
-
+    // Step 1: Go to FDA homepage and click Log-In
     await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(3000);
-
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('a, button'));
-      const loginBtn = btns.find(b => b.textContent.toLowerCase().includes('log'));
-      if (loginBtn) loginBtn.click();
+      const btn = btns.find(b => b.textContent.toLowerCase().includes('log'));
+      if (btn) btn.click();
     });
     await page.waitForTimeout(5000);
 
+    // Step 2: Check "I understand" and click Login
     await page.check('input[type="checkbox"]').catch(() => {});
     await page.waitForTimeout(1000);
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('a, button'));
-      const loginBtn = btns.find(b => b.textContent.toLowerCase().includes('login') || b.textContent.toLowerCase().includes('log in'));
-      if (loginBtn) loginBtn.click();
+      const btn = btns.find(b => b.textContent.toLowerCase().includes('login') || b.textContent.toLowerCase().includes('log in'));
+      if (btn) btn.click();
     });
     await page.waitForTimeout(5000);
 
+    // Step 3: Enter Account ID
     await safeFill(page, 'input[name="accountId"], input[name="username"], input[type="text"]', fdaUsername);
     await page.waitForTimeout(1000);
     await page.evaluate(() => {
@@ -92,6 +79,7 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
+    // Step 4: Enter Password
     await safeFill(page, 'input[name="password"], input[type="password"]', fdaPassword);
     await page.waitForTimeout(1000);
     await page.evaluate(() => {
@@ -100,16 +88,23 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-        // Click "Send Code" button
+    // Step 5: Click Send Code
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
-      const sendBtn = btns.find(b => b.textContent.toLowerCase().includes('send code'));
-      if (sendBtn) sendBtn.click();
+      const btn = btns.find(b => b.textContent.toLowerCase().includes('send code'));
+      if (btn) btn.click();
     }).catch(() => {});
     await page.waitForTimeout(3000);
 
+    sessions[sessionId] = { browser, page, status: "awaiting_otp" };
+    res.json({ success: true, status: "awaiting_otp" });
 
-   app.post("/submit-otp", async (req, res) => {
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/submit-otp", async (req, res) => {
   const { sessionId, otp } = req.body;
   if (!sessionId || !otp)
     return res.status(400).json({ error: "sessionId and otp required" });
@@ -119,36 +114,29 @@ app.post("/start-login", async (req, res) => {
     return res.status(404).json({ error: "Session not found or expired" });
 
   try {
-    // Fill OTP field
-    await safeFill(session.page, 'input[placeholder="Enter Code Here"], input[name="otp"], input[name="code"], input[name="verificationCode"], input[type="text"]', otp);
+    // Fill OTP
+    await safeFill(session.page, 'input[placeholder="Enter Code Here"], input[name="otp"], input[name="code"], input[type="text"]', otp);
     await session.page.waitForTimeout(500);
 
-    // Click "Submit Code"
+    // Click Submit Code
     await session.page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
-      const submitBtn = btns.find(b => b.textContent.toLowerCase().includes('submit code') || b.textContent.toLowerCase().includes('submit'));
-      if (submitBtn) submitBtn.click();
+      const btn = btns.find(b => b.textContent.toLowerCase().includes('submit code') || b.textContent.toLowerCase().includes('submit'));
+      if (btn) btn.click();
     });
     await session.page.waitForTimeout(3000);
 
-    // Click "Continue with Password" to skip passkey popup
+    // Click "Continue with Password" to skip passkey
     await session.page.evaluate(() => {
       const links = Array.from(document.querySelectorAll('a, button'));
-      const continueBtn = links.find(b => b.textContent.toLowerCase().includes('continue with password'));
-      if (continueBtn) continueBtn.click();
+      const btn = links.find(b => b.textContent.toLowerCase().includes('continue with password'));
+      if (btn) btn.click();
     }).catch(() => {});
     await session.page.waitForTimeout(2000);
 
     session.status = "logged_in";
     res.json({ success: true, status: "logged_in" });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
 
-    await session.page.waitForTimeout(5000);
-    session.status = "logged_in";
-    res.json({ success: true, status: "logged_in" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -165,7 +153,7 @@ app.post("/submit-pnc", async (req, res) => {
 
   const { page, browser } = session;
   const logs = [];
-  const log  = (msg) => { console.log(`[PNC] ${msg}`); logs.push(msg); };
+  const log = (msg) => { console.log(`[PNC] ${msg}`); logs.push(msg); };
 
   try {
     log("Opening new Prior Notice...");
@@ -196,7 +184,7 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-    const body  = await page.textContent("body");
+    const body = await page.textContent("body");
     const match = body.match(/Prior Notice (?:Number|#|Confirmation)[:\s]+([A-Z0-9\-]+)/i);
     const confirmationNumber = match?.[1] || "Submitted — check PNC portal";
     log(`✅ PNC# ${confirmationNumber}`);
@@ -223,7 +211,7 @@ app.post("/submit-all-pnc", async (req, res) => {
   const results = [];
   for (const invoice of invoices.filter((i) => i.needsPNC)) {
     const logs = [];
-    const log  = (msg) => { console.log(`[PNC] ${msg}`); logs.push(msg); };
+    const log = (msg) => { console.log(`[PNC] ${msg}`); logs.push(msg); };
     const { page } = session;
     try {
       await page.evaluate(() => {
@@ -249,7 +237,7 @@ app.post("/submit-all-pnc", async (req, res) => {
       });
       await page.waitForTimeout(5000);
 
-      const body  = await page.textContent("body");
+      const body = await page.textContent("body");
       const match = body.match(/Prior Notice (?:Number|#|Confirmation)[:\s]+([A-Z0-9\-]+)/i);
       const confirmationNumber = match?.[1] || "Submitted";
       log(`✅ PNC# ${confirmationNumber}`);
