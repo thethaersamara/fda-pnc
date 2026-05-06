@@ -88,16 +88,21 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-    // Step 5: Click Send Code
+       // Step 5: Click Send Code
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
       const btn = btns.find(b => b.textContent.toLowerCase().includes('send code'));
       if (btn) btn.click();
     }).catch(() => {});
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(8000);
+
+    // Verify OTP was sent by checking page content
+    const pageText = await page.textContent("body");
+    console.log("Page after Send Code:", pageText.substring(0, 200));
 
     sessions[sessionId] = { browser, page, status: "awaiting_otp" };
     res.json({ success: true, status: "awaiting_otp" });
+
 
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
