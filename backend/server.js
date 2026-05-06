@@ -83,7 +83,7 @@ app.post("/start-login", async (req, res) => {
     await page.evaluate((pwd) => {
       const inputs = document.querySelectorAll('input[type="password"], input[type="text"]');
       if (inputs.length > 0) inputs[inputs.length - 1].value = pwd;
-    }, credentials.password).catch(() => {});
+    }, password).catch(() => {});
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
       const btn = btns.find(b => (b.textContent || b.value || '').toLowerCase().includes('next') || 
