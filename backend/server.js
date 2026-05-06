@@ -283,7 +283,7 @@ app.post("/submit-pnc", async (req, res) => {
 
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
+      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes);
       if (btn) btn.click();
     });
     await page.waitForTimeout(3000);
@@ -306,17 +306,21 @@ app.post("/submit-pnc", async (req, res) => {
     log("Address popup: " + addressPopup);
     await page.waitForTimeout(1000);
 
-    await page.evaluate(() => {
+     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
       const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
       if (btn) btn.click();
     });
-    await page.waitForTimeout(3000);
+
+    // Wait for navigation to complete
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
+    await page.waitForTimeout(4000);
 
     const pageTitle = await page.evaluate(() => {
       const h1 = document.querySelector("h1");
       return h1 ? h1.textContent : document.title;
     });
+
     log("Reached page: " + pageTitle);
 
     res.json({ success: true, logs, status: "reached_food_article" });
