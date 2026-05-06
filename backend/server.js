@@ -3,7 +3,7 @@ const express = require("express");
 const cors    = require("cors");
 const { chromium } = require("playwright-core"); 
 
-const app      = express();
+const app      = express(); 
 const PORT     = process.env.PORT || 3001;
 const BB_KEY   = process.env.BROWSERBASE_API_KEY || "bb_live_ObfYaIPxJbYfxQ_e1IMbsmwuluE";
 const BB_PROJECT = process.env.BROWSERBASE_PROJECT_ID || "529bb6fc-5478-4648-b83c-e9eb4531a1fb";
@@ -54,9 +54,11 @@ app.post("/start-login", async (req, res) => {
     return res.status(400).json({ error: "sessionId, fdaUsername, fdaPassword required" });
 
   try {
-    const { browser } = await createBrowser();
-    const context = browser.contexts()[0];
+        const { browser } = await createBrowser();
+    const contexts = browser.contexts();
+    const context = contexts.length > 0 ? contexts[0] : await browser.newContext();
     const page    = await context.newPage();
+
 
     await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(3000);
