@@ -323,10 +323,17 @@ const [invoices, setInvoices] = useState([{
         body: JSON.stringify({ sessionId: SESSION_ID, fdaUsername: fdaUser, fdaPassword: fdaPass }),
       });
 
-      if (!res.ok) {
+            if (!res.ok && res.status !== 520) {
         const text = await res.text();
         throw new Error(`Server error ${res.status}: ${text}`);
       }
+      if (res.status === 520) {
+        setLoginStatus("awaiting_otp");
+        setShowCreds(false);
+        setShowOTP(true);
+        return;
+      }
+
       const data = await res.json();
       if (data.success) {
         setLoginStatus("awaiting_otp");
