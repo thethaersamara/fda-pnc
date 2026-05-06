@@ -79,30 +79,34 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-            // Step 4: Enter Password and click Next
+             // Step 4: Enter Password and click Next
     await page.waitForTimeout(2000);
-    const pwdField = await page.$('input[type="password"]');
-    if (pwdField) {
-      await pwdField.click({ clickCount: 3 });
-      await pwdField.type(fdaPassword, { delay: 50 });
-      console.log("Typed password into field");
-    } else {
-      console.log("Password field NOT found");
-    }
-    await page.waitForTimeout(1000);
-    const nextBtn = await page.$('button[type="submit"], input[type="submit"]');
-    if (nextBtn) {
-      await nextBtn.click();
-      console.log("Clicked Next button");
-    } else {
-      // fallback: find by text
-      await page.evaluate(() => {
-        const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
-        const btn = btns.find(b => (b.textContent || b.value || '').trim().toLowerCase() === 'next');
-        if (btn) btn.click();
-      });
-      console.log("Clicked Next via fallback");
-    }
+    await page.evaluate((pwd) => {
+      // Find password field even if hidden
+      const inputs = Array.from(document.querySelectorAll('input'));
+      const pwdInput = inputs.find(i => i.type === 'password') || 
+                       inputs.find(i => i.name?.toLowerCase().includes('pass')) ||
+                       inputs.find(i => i.id?.toLowerCase().includes('pass'));
+      if (pwdInput) {
+        pwdInput.removeAttribute('disabled');
+        pwdInput.style.display = 'block';
+        pwdInput.style.visibility = 'visible';
+        pwdInput.focus();
+        pwdInput.value = pwd;
+        pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
+        pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
+        console.log('Password set on:', pwdInput.id || pwdInput.name);
+      } else {
+        console.log('No password field found');
+      }
+    }, fdaPassword);
+    await page.waitForTimeout(500);
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+      const btn = btns.find(b => (b.textContent || b.value || '').trim().toLowerCase() === 'next');
+      if (btn) { btn.click(); console.log('Clicked Next'); }
+      else console.log('Next button not found');
+    });
     console.log("Waiting for Send Code popup...");
     await page.waitForTimeout(5000);
 
