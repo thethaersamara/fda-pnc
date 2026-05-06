@@ -16,7 +16,7 @@ app.options("*", cors());
 
 const sessions = {};
 
-async function safeFill(page, selector, value) {
+async function safeFill(page, selector, value) { 
   if (!value) return;
   try { await page.fill(selector, String(value)); } catch { }
 }
@@ -40,11 +40,13 @@ async function createBrowser() {
     body: JSON.stringify({ projectId: BB_PROJECT }),
   });
   const bbSession = await response.json();
-  console.log("Browserbase session:", JSON.stringify(bbSession));
+  console.log("Browserbase session created:", bbSession.id);
   if (!bbSession.id) throw new Error("Failed to create Browserbase session: " + JSON.stringify(bbSession));
-  const browser = await chromium.connectOverCDP(
-    `wss://connect.browserbase.com?apiKey=${BB_KEY}&sessionId=${bbSession.id}`
-  );
+  
+  const connectUrl = bbSession.connectUrl || `wss://connect.browserbase.com?apiKey=${BB_KEY}&sessionId=${bbSession.id}`;
+  console.log("Connecting to:", connectUrl.substring(0, 50));
+  
+  const browser = await chromium.connectOverCDP(connectUrl);
   return { browser };
 
 }
