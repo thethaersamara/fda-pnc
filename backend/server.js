@@ -13,7 +13,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"], allowedHeaders: ["Content-Type", "Authorization"] }));
 app.options("*", cors());
 
-const sessions = {};
+const sessions = {}; 
 
 async function safeFill(page, selector, value) {
   if (!value) return;
@@ -88,12 +88,16 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-       // Step 5: Click Send Code
+           // Step 5: Click Send Code
+    const pageContent5 = await page.content();
+    console.log("Page HTML before Send Code:", pageContent5.substring(0, 500));
     await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
-      const btn = btns.find(b => b.textContent.toLowerCase().includes('send code'));
-      if (btn) btn.click();
+      const all = Array.from(document.querySelectorAll('*'));
+      const el = all.find(e => e.textContent.trim().toLowerCase() === 'send code' || e.value?.toLowerCase() === 'send code');
+      if (el) { console.log('Found Send Code element:', el.tagName, el.className); el.click(); }
+      else console.log('Send Code button NOT FOUND');
     }).catch(() => {});
+
     await page.waitForTimeout(8000);
 
     // Verify OTP was sent by checking page content
