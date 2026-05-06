@@ -79,36 +79,27 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-             // Step 4: Enter Password and click Next
-    await page.waitForTimeout(2000);
-    await page.evaluate((pwd) => {
-      // Find password field even if hidden
-      const inputs = Array.from(document.querySelectorAll('input'));
-      const pwdInput = inputs.find(i => i.type === 'password') || 
-                       inputs.find(i => i.name?.toLowerCase().includes('pass')) ||
-                       inputs.find(i => i.id?.toLowerCase().includes('pass'));
-      if (pwdInput) {
-        pwdInput.removeAttribute('disabled');
-        pwdInput.style.display = 'block';
-        pwdInput.style.visibility = 'visible';
-        pwdInput.focus();
-        pwdInput.value = pwd;
-        pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
-        pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
-        console.log('Password set on:', pwdInput.id || pwdInput.name);
-      } else {
-        console.log('No password field found');
-      }
-    }, fdaPassword);
+                 // Step 4: Enter Password and click Next
+    await page.waitForTimeout(3000);
+    // Click somewhere on the page first to ensure focus
+    await page.mouse.click(640, 400);
     await page.waitForTimeout(500);
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
-      const btn = btns.find(b => (b.textContent || b.value || '').trim().toLowerCase() === 'next');
-      if (btn) { btn.click(); console.log('Clicked Next'); }
-      else console.log('Next button not found');
-    });
-    console.log("Waiting for Send Code popup...");
+    // Tab to find the password field and type
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(300);
+    // Try clicking the password field area and typing
+    await page.evaluate((pwd) => {
+      const all = Array.from(document.querySelectorAll('input'));
+      console.log('All inputs:', all.map(i => `${i.type}|${i.id}|${i.name}|${i.className}`).join(', '));
+    }, fdaPassword);
+    await page.keyboard.type(fdaPassword, { delay: 100 });
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Enter');
+    console.log("Typed password and pressed Enter, waiting for Send Code popup...");
     await page.waitForTimeout(5000);
+
 
     
     // Step 5: Wait for Send Code popup to appear
