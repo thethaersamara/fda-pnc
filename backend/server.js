@@ -115,7 +115,7 @@ app.post("/start-login", async (req, res) => {
       return "Next not found";
     });
     console.log("Next button result:", clicked);
-    console.log("Waiting for Send Code popup...");
+    console.log("Waiting for Send Code ...");
     await page.waitForTimeout(5000);
 
     await page.waitForTimeout(5000);
@@ -298,7 +298,7 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(1000);
 
           await page.waitForTimeout(2000);
-            const addressPopup = await page.evaluate(() => {
+            const address = await page.evaluate(() => {
       // First select the Original Address radio button
       const radios = Array.from(document.querySelectorAll("input[type='radio']"));
       const originalRadio = radios.find(r => {
@@ -310,7 +310,7 @@ app.post("/submit-pnc", async (req, res) => {
       const btns = Array.from(document.querySelectorAll("button"));
       const okBtn = btns.find(b => b.textContent.trim() === "Ok" || b.textContent.trim() === "OK");
       if (okBtn) { okBtn.click(); return "Clicked Original Address + Ok"; }
-      return "No popup found";
+      return "No  found";
 
     });
 
@@ -319,30 +319,7 @@ app.post("/submit-pnc", async (req, res) => {
     // Wait for popup to close then click SAVE & CONTINUE
     await page.waitForTimeout(3000);
     const pageAfterPopup = await page.evaluate(() => document.body.innerText);
-    log("Page after popup: " + pageAfterPopup.substring(0, 150));
-
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => {}),
-      page.evaluate(() => {
-        const btns = Array.from(document.querySelectorAll("button, a"));
-        const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
-        if (btn) btn.click();
-      }).catch(() => {})
-    ]);
-    await page.waitForTimeout(4000);
-
-
-
-    
-    const pageTitle = await page.evaluate(() => {
-      const h1 = document.querySelector("h1");
-      return h1 ? h1.textContent : document.title;
-    });
-
-    log("Reached page: " + pageTitle);
-
-    res.json({ success: true, logs, status: "reached_food_article" });
-
+        res.json({ success: true, logs, status: "reached_food_article" });
   } catch (err) {
     log("ERROR: " + err.message);
     res.status(500).json({ success: false, error: err.message, logs });
