@@ -11,7 +11,7 @@ const BB_PROJECT = process.env.BROWSERBASE_PROJECT_ID || "529bb6fc-5478-4648-b83
 app.use(express.json({ limit: "10mb" })); 
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"], allowedHeaders: ["Content-Type", "Authorization"] }));
-app.options("*", cors());
+app.options("*", cors()); 
 
 const sessions = {}; 
 
@@ -79,48 +79,37 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-        // Step 4: Enter Password and click Next
+           // Step 4: Enter Password - use real keyboard simulation
     await page.waitForTimeout(3000);
-    const allInputs = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('input'))
-        .map(i => `${i.type}|${i.id}|${i.name}|${i.className}`);
-    });
-    console.log("All inputs on password page:", JSON.stringify(allInputs));
-
-    // Type password into whichever input is visible
-       const typed = await page.evaluate((pwd) => {
+    
+    // First click on the password field to focus it
+    const focused = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll('input'));
-      // Target password field specifically
-      const pwdInput = inputs.find(i => i.type === 'password') || 
-                       inputs.find(i => i.getBoundingClientRect().width > 0);
-      if (pwdInput) {
-        pwdInput.focus();
-        pwdInput.value = pwd;
-        pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
-        pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
-        return `Typed into: ${pwdInput.type}|${pwdInput.id}`;
-      }
-      return 'No input found';
-    }, fdaPassword);
-
-    console.log("Password typing result:", typed);
-
+      const pwd = inputs.find(i => i.type === 'password');
+      if (pwd) { pwd.focus(); pwd.click(); return 'Focused password field'; }
+      return 'No password field';
+    });
+    console.log("Focus result:", focused);
     await page.waitForTimeout(500);
-    // Click the Next button directly via JS
+    
+    // Clear field and type character by character
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type(fdaPassword, { delay: 150 });
+    console.log("Typed password via keyboard");
+    await page.waitForTimeout(500);
+    
+    // Click Next button
     const clicked = await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"]'));
-      console.log('Buttons found:', btns.map(b => b.textContent || b.value).join(', '));
+      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
       const btn = btns.find(b => (b.textContent || b.value || '').trim().toLowerCase() === 'next');
       if (btn) { btn.click(); return 'Clicked Next'; }
-      // fallback: click any visible button
-      const visibleBtn = btns.find(b => b.getBoundingClientRect().width > 0);
-      if (visibleBtn) { visibleBtn.click(); return 'Clicked fallback: ' + (visibleBtn.textContent || visibleBtn.value); }
-      return 'No button found';
+      return 'Next not found';
     });
     console.log("Next button result:", clicked);
-
-    console.log("Pressed Enter, waiting for Send Code popup...");
+    console.log("Waiting for Send Code popup...");
     await page.waitForTimeout(5000);
+
 
 
     
