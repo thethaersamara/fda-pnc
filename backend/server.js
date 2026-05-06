@@ -79,33 +79,33 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-    // Step 4: Enter Password
-    await safeFill(page, 'input[name="password"], input[type="password"]', fdaPassword);
-    await page.waitForTimeout(1000);
+        // Step 4: Enter Password and click Next
+    await page.evaluate((pwd) => {
+      const inputs = document.querySelectorAll('input[type="password"], input[type="text"]');
+      if (inputs.length > 0) inputs[inputs.length - 1].value = pwd;
+    }, credentials.password).catch(() => {});
     await page.evaluate(() => {
-      const btn = document.querySelector('button[type="submit"], input[type="submit"], button');
+      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+      const btn = btns.find(b => (b.textContent || b.value || '').toLowerCase().includes('next') || 
+                                  (b.textContent || b.value || '').toLowerCase().includes('submit') ||
+                                  (b.textContent || b.value || '').toLowerCase().includes('sign in'));
       if (btn) btn.click();
-    });
+    }).catch(() => {});
+    console.log("Clicked Next after password, waiting for Send Code popup...");
+    
+    // Step 5: Wait for Send Code popup to appear
     await page.waitForTimeout(5000);
-
-               // Step 5: Wait for Send Code button and click it
-    console.log("Waiting for Send Code button...");
-    try {
-      await page.waitForFunction(() => {
-        const all = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a'));
-        return all.some(e => (e.textContent || e.value || '').toLowerCase().includes('send code'));
-      }, { timeout: 15000 });
-      console.log("Send Code button found!");
-    } catch(e) {
-      console.log("Send Code button wait timeout:", e.message);
-    }
+    const pageAfterPwd = await page.evaluate(() => document.body.innerText);
+    console.log("Page text after password Next:", pageAfterPwd.substring(0, 300));
+    
     await page.evaluate(() => {
       const all = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a'));
       const el = all.find(e => (e.textContent || e.value || '').toLowerCase().includes('send code'));
       if (el) { el.click(); console.log('Clicked Send Code'); }
-      else console.log('Send Code NOT found after wait');
+      else console.log('Send Code button NOT found - visible text logged above');
     }).catch(() => {});
     await page.waitForTimeout(8000);
+
 
 
     // Verify OTP was sent by checking page content
