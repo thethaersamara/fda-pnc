@@ -70,14 +70,32 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-    // Step 3: Enter Account ID
-    await safeFill(page, 'input[name="accountId"], input[name="username"], input[type="text"]', fdaUsername);
-    await page.waitForTimeout(1000);
-    await page.evaluate(() => {
-      const btn = document.querySelector('button[type="submit"], input[type="submit"], button');
-      if (btn) btn.click();
+        // Step 3: Enter Account ID
+    await page.waitForTimeout(2000);
+    const step3Inputs = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('input'))
+        .map(i => `${i.type}|${i.id}|${i.name}`);
     });
-    await page.waitForTimeout(5000);
+    console.log("Step 3 inputs:", JSON.stringify(step3Inputs));
+    
+    await safeFill(page, 'input[name="accountId"], input[name="username"], input[type="text"]', fdaUsername);
+    await page.waitForTimeout(500);
+    
+    const step3Clicked = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+      console.log('Step 3 buttons:', btns.map(b => b.textContent || b.value).join(', '));
+      const btn = btns.find(b => (b.textContent || b.value || '').trim().toLowerCase() === 'next');
+      if (btn) { btn.click(); return 'Clicked Next'; }
+      const anyBtn = btns[0];
+      if (anyBtn) { anyBtn.click(); return 'Clicked: ' + (anyBtn.textContent || anyBtn.value); }
+      return 'No button found';
+    });
+    console.log("Step 3 button result:", step3Clicked);
+    
+    const step3Page = await page.evaluate(() => document.body.innerText);
+    console.log("Page after Account ID:", step3Page.substring(0, 200));
+    await page.waitForTimeout(3000);
+
 
            // Step 4: Enter Password - use real keyboard simulation
     await page.waitForTimeout(3000);
