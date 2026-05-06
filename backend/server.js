@@ -298,12 +298,22 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(1000);
 
           await page.waitForTimeout(2000);
-    const addressPopup = await page.evaluate(() => {
+            const addressPopup = await page.evaluate(() => {
+      // First select the Original Address radio button
+      const radios = Array.from(document.querySelectorAll("input[type='radio']"));
+      const originalRadio = radios.find(r => {
+        const label = r.closest("label") || r.parentElement;
+        return (label && label.textContent.includes("Original Address")) || r.value?.includes("original") || r.value === "0";
+      });
+      if (originalRadio) { originalRadio.click(); }
+      // Then click Ok
       const btns = Array.from(document.querySelectorAll("button"));
       const okBtn = btns.find(b => b.textContent.trim() === "Ok" || b.textContent.trim() === "OK");
-      if (okBtn) { okBtn.click(); return "Dismissed address popup"; }
+      if (okBtn) { okBtn.click(); return "Clicked Original Address + Ok"; }
       return "No popup found";
+
     });
+
     log("Address popup: " + addressPopup);
 
     // Wait for popup to close then click SAVE & CONTINUE
