@@ -186,13 +186,26 @@ app.post("/submit-pnc", async (req, res) => {
   const log = (msg) => { console.log("[PNC] " + msg); logs.push(msg); };
 
   try {
-        log("Navigating to PNSI...");
-    await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(2000);
+           log("Navigating to PNSI...");
+    await page.goto("https://www.access.fda.gov/pnsi-app/#/dashboard", { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.waitForTimeout(5000);
+    const pnsiTitle = await page.evaluate(() => document.body.innerText);
+    log("PNSI page: " + pnsiTitle.substring(0, 150));
+
+    if (!pnsiTitle.includes("Prior Notice") && !pnsiTitle.includes("PRIOR NOTICE")) {
+      return res.status(401).json({ success: false, error: "Could not reach PNSI - please login again", logs });
+    }
+
+    log("Clicking Create New Prior Notice...");
     await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll("a"));
-      const link = links.find(l => l.textContent.includes("Prior Notice System Interface"));
-      if (link) link.click();
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("CREATE NEW PRIOR NOTICE") || b.textContent.includes("Create New Prior Notice"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+    const afterCreate = await page.evaluate(() => document.body.innerText);
+    log("After Create click: " + afterCreate.substring(0, 150));
+
     });
 
     await page.waitForTimeout(3000);
