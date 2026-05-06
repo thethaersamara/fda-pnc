@@ -103,15 +103,6 @@ app.post("/start-login", async (req, res) => {
       return 'No input found';
     }, fdaPassword);
 
-          input.focus();
-          input.value = pwd;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-          return `Typed into: ${input.type}|${input.id}|${input.name}`;
-        }
-      }
-      return 'No visible input found';
-    }, fdaPassword);
     console.log("Password typing result:", typed);
 
     await page.waitForTimeout(500);
