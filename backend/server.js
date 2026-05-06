@@ -1,32 +1,17 @@
 require("dotenv").config();
-const express      = require("express");
-const cors         = require("cors");
-const { chromium } = require("playwright");
-
-const BROWSER_ARGS = [
-  '--no-sandbox',
-  '--disable-setuid-sandbox',
-  '--disable-blink-features=AutomationControlled',
-  '--disable-infobars',
-  '--window-size=1920,1080',
-  '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-];
-
-
+const express = require("express");
+const cors    = require("cors");
+const { chromium } = require("playwright-core");
 
 const app      = express();
 const PORT     = process.env.PORT || 3001;
-const HEADLESS = process.env.HEADLESS !== "false";  
+const BB_KEY   = process.env.BROWSERBASE_API_KEY || "bb_live_ObfYaIPxJbYfxQ_e1IMbsmwuluE";
+const BB_PROJECT = process.env.BROWSERBASE_PROJECT_ID || "";
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"], allowedHeaders: ["Content-Type", "Authorization"] }));
 app.options("*", cors());
-app.use((req, res, next) => {
-  res.setHeader("ngrok-skip-browser-warning", "true");
-  next();
-});
-
 
 const sessions = {};
 
@@ -44,10 +29,21 @@ async function safeSelect(page, selector, value) {
   } catch { }
 }
 
-app.use((req, res, next) => {
-  req.headers["ngrok-skip-browser-warning"] = "true";
-  next();
-});
+async function createBrowser() {
+  const response = await fetch("https://www.browserbase.com/v1/sessions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-bb-api-key": BB_KEY,
+    },
+    body: JSON.stringify({ projectId: BB_PROJECT }),
+  });
+  const session = await response.json();
+  const browser = await chromium.connectOverCDP(
+    `wss://connect.browserbase.com?apiKey=${BB_KEY}&sessionId=${session.id}`
+  );
+  return { browser, sessionId: session.id };
+}
 
 app.get("/health", (_, res) => res.json({ ok: true }));
 
@@ -56,31 +52,14 @@ app.post("/start-login", async (req, res) => {
   if (!sessionId || !fdaUsername || !fdaPassword)
     return res.status(400).json({ error: "sessionId, fdaUsername, fdaPassword required" });
 
-const browser = await chromium.launch({
-  headless: HEADLESS,
-  args: BROWSER_ARGS,
-  proxy: {
-    server: "https://geo.g-w.info:10443",
-    username: "user-A1tNdIJLlFjSFqtw-type-residential-session-mxfe6dov-country-us-state-newyork-rotation-15",
-    password: "rcAjK3TXywhRyyGn",
-  },
-});
-const context = await browser.newContext({
-  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  viewport: { width: 1920, height: 1080 },
-});
-const page = await context.newPage();
-await page.addInitScript(() => {
-  Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-});
-
-
-
   try {
-         await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
+    const { browser } = await createBrowser();
+    const context = browser.contexts()[0];
+    const page    = await context.newPage();
+
+    await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(3000);
 
-    // Step 1: Click Log-In on homepage
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('a, button'));
       const loginBtn = btns.find(b => b.textContent.toLowerCase().includes('log'));
@@ -88,7 +67,6 @@ await page.addInitScript(() => {
     });
     await page.waitForTimeout(5000);
 
-    // Step 2: Check "I understand" and click Login
     await page.check('input[type="checkbox"]').catch(() => {});
     await page.waitForTimeout(1000);
     await page.evaluate(() => {
@@ -98,12 +76,7 @@ await page.addInitScript(() => {
     });
     await page.waitForTimeout(5000);
 
-
-
-
-
-
-        await safeFill(page, 'input[name="accountId"], input[name="username"], input[type="text"]', fdaUsername);
+    await safeFill(page, 'input[name="accountId"], input[name="username"], input[type="text"]', fdaUsername);
     await page.waitForTimeout(1000);
     await page.evaluate(() => {
       const btn = document.querySelector('button[type="submit"], input[type="submit"], button');
@@ -127,12 +100,10 @@ await page.addInitScript(() => {
     }).catch(() => {});
     await page.waitForTimeout(3000);
 
-
     sessions[sessionId] = { browser, page, status: "awaiting_otp" };
     res.json({ success: true, status: "awaiting_otp" });
 
   } catch (err) {
-    await browser.close();
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -148,8 +119,11 @@ app.post("/submit-otp", async (req, res) => {
 
   try {
     await safeFill(session.page, 'input[name="otp"], input[name="code"], input[name="verificationCode"], input[type="text"]', otp);
-    await session.page.click('button[type="submit"], input[type="submit"], button');
-    await session.page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
+    await session.page.evaluate(() => {
+      const btn = document.querySelector('button[type="submit"], input[type="submit"], button');
+      if (btn) btn.click();
+    });
+    await session.page.waitForTimeout(5000);
     session.status = "logged_in";
     res.json({ success: true, status: "logged_in" });
   } catch (err) {
@@ -172,10 +146,12 @@ app.post("/submit-pnc", async (req, res) => {
 
   try {
     log("Opening new Prior Notice...");
-    await page.click('button:has-text("Create New Prior Notice"), a:has-text("Create New Prior Notice")');
-    await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.click('button:has-text("Consumption")').catch(() => {});
-    await page.waitForTimeout(1000);
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('a, button'));
+      const btn = btns.find(b => b.textContent.toLowerCase().includes('create') || b.textContent.toLowerCase().includes('new prior'));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(3000);
 
     log("Filling form...");
     const item = invoice.items?.[0] || {};
@@ -184,16 +160,18 @@ app.post("/submit-pnc", async (req, res) => {
     await safeFill(page, '#harmonizedCode, input[name="hsCode"]', item.hsCode || "");
     await safeFill(page, '#shipperName, input[name="shipperName"]', invoice.shipper?.name || "");
     await safeFill(page, '#shipperAddress, input[name="shipperAddress"]', invoice.shipper?.address || "");
-    await safeFill(page, '#shipperCity, input[name="shipperCity"]', invoice.shipper?.city || "");
     await safeFill(page, '#consigneeName, input[name="consigneeName"]', invoice.consignee?.name || "");
     await safeFill(page, '#consigneeAddress, input[name="consigneeAddress"]', invoice.consignee?.address || "");
-    await safeFill(page, '#consigneeCity, input[name="consigneeCity"]', invoice.consignee?.city || "");
     await safeFill(page, '#carrier, input[name="carrier"]', "FedEx");
     await safeFill(page, '#billOfLading, input[name="trackingNumber"]', invoice.trackingNumber || invoice.invoiceNumber || "");
 
     log("Submitting...");
-    await page.click('button:has-text("Submit to FDA"), button:has-text("Submit")');
-    await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+      const btn = btns.find(b => b.textContent.toLowerCase().includes('submit'));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
 
     const body  = await page.textContent("body");
     const match = body.match(/Prior Notice (?:Number|#|Confirmation)[:\s]+([A-Z0-9\-]+)/i);
@@ -225,11 +203,12 @@ app.post("/submit-all-pnc", async (req, res) => {
     const log  = (msg) => { console.log(`[PNC] ${msg}`); logs.push(msg); };
     const { page } = session;
     try {
-      log("Opening new Prior Notice...");
-      await page.click('button:has-text("Create New Prior Notice"), a:has-text("Create New Prior Notice")');
-      await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
-      await page.click('button:has-text("Consumption")').catch(() => {});
-      await page.waitForTimeout(1000);
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll('a, button'));
+        const btn = btns.find(b => b.textContent.toLowerCase().includes('create') || b.textContent.toLowerCase().includes('new prior'));
+        if (btn) btn.click();
+      });
+      await page.waitForTimeout(3000);
 
       const item = invoice.items?.[0] || {};
       await safeFill(page, '#articleDescription, input[name="articleDescription"]', item.description || "");
@@ -240,8 +219,12 @@ app.post("/submit-all-pnc", async (req, res) => {
       await safeFill(page, '#carrier, input[name="carrier"]', "FedEx");
       await safeFill(page, '#billOfLading, input[name="trackingNumber"]', invoice.trackingNumber || "");
 
-      await page.click('button:has-text("Submit to FDA"), button:has-text("Submit")');
-      await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 60000 });
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+        const btn = btns.find(b => b.textContent.toLowerCase().includes('submit'));
+        if (btn) btn.click();
+      });
+      await page.waitForTimeout(5000);
 
       const body  = await page.textContent("body");
       const match = body.match(/Prior Notice (?:Number|#|Confirmation)[:\s]+([A-Z0-9\-]+)/i);
