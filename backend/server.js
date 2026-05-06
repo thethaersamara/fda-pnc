@@ -1,12 +1,13 @@
 require("dotenv").config();
 const express = require("express");
 const cors    = require("cors");
-const { chromium } = require("playwright-core");
+const { chromium } = require("playwright-core"); 
 
 const app      = express();
 const PORT     = process.env.PORT || 3001;
 const BB_KEY   = process.env.BROWSERBASE_API_KEY || "bb_live_ObfYaIPxJbYfxQ_e1IMbsmwuluE";
-const BB_PROJECT = process.env.BROWSERBASE_PROJECT_ID || "";
+const BB_PROJECT = process.env.BROWSERBASE_PROJECT_ID || "529bb6fc-5478-4648-b83c-e9eb4531a1fb";
+
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
