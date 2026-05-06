@@ -314,7 +314,8 @@ app.post("/submit-pnc", async (req, res) => {
 
     });
 
-    log("Address popup: " + addressPopup);
+    log("Address popup handled");
+
 
     // Wait for popup to close then click SAVE & CONTINUE
     await page.waitForTimeout(3000);
