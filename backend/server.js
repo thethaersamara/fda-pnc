@@ -297,7 +297,7 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(1000);
 
-       await page.waitForTimeout(2000);
+          await page.waitForTimeout(2000);
     const addressPopup = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button"));
       const okBtn = btns.find(b => b.textContent.trim() === "Ok" || b.textContent.trim() === "OK");
@@ -306,15 +306,21 @@ app.post("/submit-pnc", async (req, res) => {
     });
     log("Address popup: " + addressPopup);
 
+    // Wait for popup to close then click SAVE & CONTINUE
+    await page.waitForTimeout(3000);
+    const pageAfterPopup = await page.evaluate(() => document.body.innerText);
+    log("Page after popup: " + pageAfterPopup.substring(0, 150));
+
     await Promise.all([
       page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => {}),
-      page.waitForTimeout(2000).then(() => page.evaluate(() => {
+      page.evaluate(() => {
         const btns = Array.from(document.querySelectorAll("button, a"));
         const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
         if (btn) btn.click();
-      }).catch(() => {}))
+      }).catch(() => {})
     ]);
     await page.waitForTimeout(4000);
+
 
 
     
