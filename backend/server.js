@@ -284,43 +284,46 @@ app.post("/submit-pnc", async (req, res) => {
 
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes);
+      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
       if (btn) btn.click();
     });
     await page.waitForTimeout(3000);
 
-    log("Submitter Details - Creating for Myself...");
+        log("Submitter Details - Creating for Myself...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
       const btn = btns.find(b => b.textContent.includes("Creating for Myself"));
       if (btn) btn.click();
     });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(3000);
 
-          await page.waitForTimeout(2000);
-            const address = await page.evaluate(() => {
-      // First select the Original Address radio button
+    // Handle address popup - select Original Address radio then click Ok
+    const addressResult = await page.evaluate(() => {
       const radios = Array.from(document.querySelectorAll("input[type='radio']"));
       const originalRadio = radios.find(r => {
-        const label = r.closest("label") || r.parentElement;
-        return (label && label.textContent.includes("Original Address")) || r.value?.includes("original") || r.value === "0";
+        const parent = r.closest("label") || r.parentElement;
+        return (parent && parent.textContent.includes("Original Address")) || r.value === "0";
       });
       if (originalRadio) { originalRadio.click(); }
-      // Then click Ok
       const btns = Array.from(document.querySelectorAll("button"));
       const okBtn = btns.find(b => b.textContent.trim() === "Ok" || b.textContent.trim() === "OK");
       if (okBtn) { okBtn.click(); return "Clicked Original Address + Ok"; }
-      return "No  found";
-
+      return "No popup found";
     });
+    log("Address popup: " + addressResult);
 
-    log("Address popup handled");
+    // Wait for navigation to Submission Overview
+    await page.waitForLoadState("domcontentloaded").catch(() => {});
+    await page.waitForTimeout(4000);
 
+    const pageTitle = await page.evaluate(() => {
+      const h1 = document.querySelector("h1");
+      return h1 ? h1.textContent : document.title;
+    });
+    log("Reached page: " + pageTitle);
 
-    // Wait for popup to close then click SAVE & CONTINUE
-    await page.waitForTimeout(3000);
-    const pageAfterPopup = await page.evaluate(() => document.body.innerText);
-        res.json({ success: true, logs, status: "reached_food_article" });
+    res.json({ success: true, logs, status: "reached_food_article" });
+
   } catch (err) {
     log("ERROR: " + err.message);
     res.status(500).json({ success: false, error: err.message, logs });
