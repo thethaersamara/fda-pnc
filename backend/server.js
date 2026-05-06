@@ -39,11 +39,14 @@ async function createBrowser() {
     },
     body: JSON.stringify({ projectId: BB_PROJECT }),
   });
-  const session = await response.json();
+  const bbSession = await response.json();
+  console.log("Browserbase session:", JSON.stringify(bbSession));
+  if (!bbSession.id) throw new Error("Failed to create Browserbase session: " + JSON.stringify(bbSession));
   const browser = await chromium.connectOverCDP(
-    `wss://connect.browserbase.com?apiKey=${BB_KEY}&sessionId=${session.id}`
+    `wss://connect.browserbase.com?apiKey=${BB_KEY}&sessionId=${bbSession.id}`
   );
-  return { browser, sessionId: session.id };
+  return { browser };
+
 }
 
 app.get("/health", (_, res) => res.json({ ok: true }));
