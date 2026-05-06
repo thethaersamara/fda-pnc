@@ -249,7 +249,23 @@ function InvoiceCard({ invoice, idx, onUpdate, onSubmit, onRemove, submitting, l
 }
 
 export default function App() {
-  const [invoices,    setInvoices]    = useState([]);
+const [invoices, setInvoices] = useState([{
+  invoiceNumber: "200151",
+  invoiceDate: "2026-04-04",
+  trackingNumber: "8921891",
+  portOfEntry: "Memphis",
+  estimatedArrival: "",
+  originCountry: "Israel",
+  shipper: { name: "Abdallah Muhtadi", address: "Al Zaharia 12 5", city: "Jerusalem", zip: "9730000", country: "Israel" },
+  consignee: { name: "FORWARD2ME", address: "Schwedter Allee 23", city: "Schwedt", zip: "16303", country: "Germany" },
+  items: [{ description: "Extra Virgin Olive Oil", hsCode: "1509", quantity: 1, unitValue: 6, totalValue: 6, countryOfOrigin: "Israel", needsPNC: true }],
+  totalValue: 19,
+  currency: "USD",
+  needsPNC: true,
+  pncStatus: "idle",
+  logs: []
+}]);
+
   const [dragging,    setDragging]    = useState(false);
   const [parsing,     setParsing]     = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
