@@ -306,21 +306,26 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(3000);
 
-    // Handle address popup - select Original Address radio then click Ok
+        // Log page state before handling popup
+    const beforePopup = await page.evaluate(() => document.body.innerText);
+    log("Page before popup handling: " + beforePopup.substring(0, 200));
 
     const addressResult = await page.evaluate(() => {
       const radios = Array.from(document.querySelectorAll("input[type='radio']"));
+      const allRadioInfo = radios.map(r => r.value + "|" + (r.closest("label") || r.parentElement)?.textContent?.trim()?.substring(0, 50)).join(", ");
       const originalRadio = radios.find(r => {
         const parent = r.closest("label") || r.parentElement;
         return (parent && parent.textContent.includes("Original Address")) || r.value === "0";
       });
       if (originalRadio) { originalRadio.click(); }
       const btns = Array.from(document.querySelectorAll("button"));
+      const allBtns = btns.map(b => b.textContent.trim()).join(", ");
       const okBtn = btns.find(b => b.textContent.trim() === "Ok" || b.textContent.trim() === "OK");
-      if (okBtn) { okBtn.click(); return "Clicked Original Address + Ok"; }
-      return "No popup found";
+      if (okBtn) { okBtn.click(); return "Radios: " + allRadioInfo + " | Btns: " + allBtns; }
+      return "No Ok button | Radios: " + allRadioInfo + " | Btns: " + allBtns;
     });
     log("Address popup: " + addressResult);
+
 
     // Wait for navigation to Submission Overview
     await page.waitForLoadState("domcontentloaded").catch(() => {});
