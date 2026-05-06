@@ -187,7 +187,14 @@ app.post("/submit-pnc", async (req, res) => {
 
   try {
         log("Navigating to PNSI...");
-    await page.goto("https://www.access.fda.gov/oaa/pnsi", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+    await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+    await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll("a"));
+      const link = links.find(l => l.textContent.includes("Prior Notice System Interface"));
+      if (link) link.click();
+    });
+
     await page.waitForTimeout(3000);
     const pnsiTitle = await page.evaluate(() => document.title);
     log("PNSI page title: " + pnsiTitle);
