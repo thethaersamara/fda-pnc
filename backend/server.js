@@ -289,7 +289,7 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(3000);
 
-        log("Submitter Details - Creating for Myself...");
+          log("Submitter Details - Creating for Myself...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
       const btn = btns.find(b => b.textContent.includes("Creating for Myself"));
@@ -297,7 +297,17 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(3000);
 
+    // Click SAVE & CONTINUE to trigger address popup
+    log("Clicking SAVE & CONTINUE on submitter page...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(3000);
+
     // Handle address popup - select Original Address radio then click Ok
+
     const addressResult = await page.evaluate(() => {
       const radios = Array.from(document.querySelectorAll("input[type='radio']"));
       const originalRadio = radios.find(r => {
