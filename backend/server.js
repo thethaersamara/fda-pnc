@@ -93,23 +93,16 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
+        // Click "Send Code" button
     await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
-      const sendBtn = btns.find(b => b.textContent.toLowerCase().includes('send'));
+      const btns = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
+      const sendBtn = btns.find(b => b.textContent.toLowerCase().includes('send code'));
       if (sendBtn) sendBtn.click();
-      else if (btns[0]) btns[0].click();
     }).catch(() => {});
     await page.waitForTimeout(3000);
 
-    sessions[sessionId] = { browser, page, status: "awaiting_otp" };
-    res.json({ success: true, status: "awaiting_otp" });
 
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-app.post("/submit-otp", async (req, res) => {
+   app.post("/submit-otp", async (req, res) => {
   const { sessionId, otp } = req.body;
   if (!sessionId || !otp)
     return res.status(400).json({ error: "sessionId and otp required" });
@@ -119,11 +112,33 @@ app.post("/submit-otp", async (req, res) => {
     return res.status(404).json({ error: "Session not found or expired" });
 
   try {
-    await safeFill(session.page, 'input[name="otp"], input[name="code"], input[name="verificationCode"], input[type="text"]', otp);
+    // Fill OTP field
+    await safeFill(session.page, 'input[placeholder="Enter Code Here"], input[name="otp"], input[name="code"], input[name="verificationCode"], input[type="text"]', otp);
+    await session.page.waitForTimeout(500);
+
+    // Click "Submit Code"
     await session.page.evaluate(() => {
-      const btn = document.querySelector('button[type="submit"], input[type="submit"], button');
-      if (btn) btn.click();
+      const btns = Array.from(document.querySelectorAll('button, a, input[type="submit"]'));
+      const submitBtn = btns.find(b => b.textContent.toLowerCase().includes('submit code') || b.textContent.toLowerCase().includes('submit'));
+      if (submitBtn) submitBtn.click();
     });
+    await session.page.waitForTimeout(3000);
+
+    // Click "Continue with Password" to skip passkey popup
+    await session.page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll('a, button'));
+      const continueBtn = links.find(b => b.textContent.toLowerCase().includes('continue with password'));
+      if (continueBtn) continueBtn.click();
+    }).catch(() => {});
+    await session.page.waitForTimeout(2000);
+
+    session.status = "logged_in";
+    res.json({ success: true, status: "logged_in" });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
     await session.page.waitForTimeout(5000);
     session.status = "logged_in";
     res.json({ success: true, status: "logged_in" });
