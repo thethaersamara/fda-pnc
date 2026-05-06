@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { chromium } = require("playwright-core");
+const { chromium } = require("playwright-core"); 
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -88,17 +88,25 @@ app.post("/start-login", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-           // Step 5: Click Send Code
-    const pageContent5 = await page.content();
-    console.log("Page HTML before Send Code:", pageContent5.substring(0, 500));
+               // Step 5: Wait for Send Code button and click it
+    console.log("Waiting for Send Code button...");
+    try {
+      await page.waitForFunction(() => {
+        const all = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a'));
+        return all.some(e => (e.textContent || e.value || '').toLowerCase().includes('send code'));
+      }, { timeout: 15000 });
+      console.log("Send Code button found!");
+    } catch(e) {
+      console.log("Send Code button wait timeout:", e.message);
+    }
     await page.evaluate(() => {
-      const all = Array.from(document.querySelectorAll('*'));
-      const el = all.find(e => e.textContent.trim().toLowerCase() === 'send code' || e.value?.toLowerCase() === 'send code');
-      if (el) { console.log('Found Send Code element:', el.tagName, el.className); el.click(); }
-      else console.log('Send Code button NOT FOUND');
+      const all = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"], a'));
+      const el = all.find(e => (e.textContent || e.value || '').toLowerCase().includes('send code'));
+      if (el) { el.click(); console.log('Clicked Send Code'); }
+      else console.log('Send Code NOT found after wait');
     }).catch(() => {});
-
     await page.waitForTimeout(8000);
+
 
     // Verify OTP was sent by checking page content
     const pageText = await page.textContent("body");
