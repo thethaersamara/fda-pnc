@@ -56,9 +56,15 @@ Rules:
 - If a field is not found, use empty string or 0
 - Return ONLY the JSON, nothing else`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      "x-api-key": "your-anthropic-api-key-here",
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1000,
