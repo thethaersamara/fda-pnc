@@ -298,22 +298,30 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(3000);
 
-          log("Submitter Details - Creating for Myself...");
+             log("Submitter Details - Creating for Myself...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
       const btn = btns.find(b => b.textContent.includes("Creating for Myself"));
       if (btn) btn.click();
     });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
+
+    // Log what page we're on after clicking Creating for Myself
+    const submitterPage = await page.evaluate(() => document.body.innerText);
+    log("Submitter form page: " + submitterPage.substring(0, 200));
 
     // Click SAVE & CONTINUE to trigger address popup
     log("Clicking SAVE & CONTINUE on submitter page...");
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
-      if (btn) btn.click();
-    });
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => {}),
+      page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll("button, a"));
+        const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
+        if (btn) btn.click();
+      })
+    ]);
     await page.waitForTimeout(3000);
+
 
         // Log page state before handling popup
     const beforePopup = await page.evaluate(() => document.body.innerText);
