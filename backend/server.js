@@ -106,7 +106,19 @@ app.post("/start-login", async (req, res) => {
     console.log("Password typing result:", typed);
 
     await page.waitForTimeout(500);
-    await page.keyboard.press('Enter');
+    // Click the Next button directly via JS
+    const clicked = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"]'));
+      console.log('Buttons found:', btns.map(b => b.textContent || b.value).join(', '));
+      const btn = btns.find(b => (b.textContent || b.value || '').trim().toLowerCase() === 'next');
+      if (btn) { btn.click(); return 'Clicked Next'; }
+      // fallback: click any visible button
+      const visibleBtn = btns.find(b => b.getBoundingClientRect().width > 0);
+      if (visibleBtn) { visibleBtn.click(); return 'Clicked fallback: ' + (visibleBtn.textContent || visibleBtn.value); }
+      return 'No button found';
+    });
+    console.log("Next button result:", clicked);
+
     console.log("Pressed Enter, waiting for Send Code popup...");
     await page.waitForTimeout(5000);
 
