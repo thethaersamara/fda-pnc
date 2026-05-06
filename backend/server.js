@@ -186,14 +186,16 @@ app.post("/submit-pnc", async (req, res) => {
   const log = (msg) => { console.log("[PNC] " + msg); logs.push(msg); };
 
   try {
-    log("Navigating to PNSI...");
-    await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll("a"));
-      const link = links.find(l => l.textContent.includes("Prior Notice System Interface"));
-      if (link) link.click();
-    });
-    await page.waitForTimeout(5000);
-    log("Page after PNSI click: " + (await page.evaluate(() => document.title)));
+        log("Navigating to PNSI...");
+    await page.goto("https://www.access.fda.gov/oaa/pnsi", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+    const pnsiTitle = await page.evaluate(() => document.title);
+    log("PNSI page title: " + pnsiTitle);
+
+    // If redirected to login, session expired
+    if (pnsiTitle.toLowerCase().includes("login") || pnsiTitle.toLowerCase().includes("sign")) {
+      return res.status(401).json({ success: false, error: "Session expired - please login again", logs });
+    }
 
     log("Clicking Create New Prior Notice...");
     await page.evaluate(() => {
