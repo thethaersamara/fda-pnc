@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3001;
 const BB_KEY = process.env.BROWSERBASE_API_KEY || "bb_live_ObfYaIPxJbYfxQ_e1IMbsmwuluE";
 const BB_PROJECT = process.env.BROWSERBASE_PROJECT_ID || "529bb6fc-5478-4648-b83c-e9eb4531a1fb";
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "10mb" })); 
 app.use(express.urlencoded({ extended: true }));
 app.use(cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"], allowedHeaders: ["Content-Type", "Authorization"] }));
 app.options("*", cors());
@@ -83,7 +83,7 @@ app.post("/start-login", async (req, res) => {
     await page.evaluate((pwd) => {
       const inputs = document.querySelectorAll('input[type="password"], input[type="text"]');
       if (inputs.length > 0) inputs[inputs.length - 1].value = pwd;
-    }, password).catch(() => {});
+    }, fdaPassword).catch(() => {});
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
       const btn = btns.find(b => (b.textContent || b.value || '').toLowerCase().includes('next') || 
