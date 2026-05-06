@@ -327,12 +327,27 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(3000);
 
-    // Step F: Submitter Details - Click "Creating for Myself"
+        // Step F: Submitter Details - Click "Creating for Myself"
     log("Submitter Details - Creating for Myself...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button, a'));
       const btn = btns.find(b => b.textContent.includes('Creating for Myself'));
       if (btn) btn.click();
+    });
+    await page.waitForTimeout(1000);
+
+    // Handle address validation popup if it appears
+    await page.waitForTimeout(2000);
+    const addressPopup = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button'));
+      const okBtn = btns.find(b => b.textContent.trim() === 'Ok' || b.textContent.trim() === 'OK');
+      if (okBtn) { okBtn.click(); return 'Dismissed address popup'; }
+      return 'No popup found';
+    });
+    log("Address popup: " + addressPopup);
+    await page.waitForTimeout(1000);
+
+    await page.evaluate(() => {
     });
     await page.waitForTimeout(1000);
     await page.evaluate(() => {
