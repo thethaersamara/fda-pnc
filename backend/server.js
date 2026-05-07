@@ -186,7 +186,7 @@ app.post("/submit-pnc", async (req, res) => {
   const log = (msg) => { console.log("[PNC] " + msg); logs.push(msg); };
 
   try {
-           log("Navigating to PNSI...");
+    log("Navigating to PNSI...");
     await page.goto("https://www.access.fda.gov/pnsi-app/#/dashboard", { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.waitForTimeout(5000);
     const pnsiTitle = await page.evaluate(() => document.body.innerText);
@@ -205,6 +205,7 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(5000);
     const afterCreate = await page.evaluate(() => document.body.innerText);
     log("After Create click: " + afterCreate.substring(0, 150));
+
 
     });
 
