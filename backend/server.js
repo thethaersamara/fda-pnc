@@ -185,9 +185,15 @@ app.post("/submit-pnc", async (req, res) => {
 
   try {    log("Navigating to PNSI...");
     // Go to OAA home and click Prior Notice System Interface link
-    await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 30000 });
-    await page.waitForFunction(() => document.body.innerText.trim().length > 100, { timeout: 15000 }).catch(() => {});
-    await page.waitForTimeout(3000);
+        // Wait for OAA page to be ready
+    await page.waitForFunction(() => 
+      document.body.innerText.includes("Prior Notice System Interface"), 
+      { timeout: 20000 }
+    ).catch(async () => {
+      // If not found, navigate to OAA
+      await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.waitForTimeout(5000);
+    });
 
     const oaaPage = await page.evaluate(() => document.body.innerText);
     log("OAA page: " + oaaPage.substring(0, 150));
@@ -199,6 +205,7 @@ app.post("/submit-pnc", async (req, res) => {
       if (link) link.click();
     });
     await page.waitForTimeout(8000);
+
 
     // Handle "PNSI open in another browser" popup
     await page.evaluate(() => {
