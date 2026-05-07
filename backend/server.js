@@ -186,7 +186,16 @@ app.post("/submit-pnc", async (req, res) => {
   try {
     log("Navigating to PNSI dashboard...");
     await page.goto("https://www.access.fda.gov/pnsi-app/#/dashboard", { waitUntil: "domcontentloaded", timeout: 30000 });
-    await page.waitForTimeout(5000);
+        await page.waitForTimeout(8000);
+
+    // Handle "PNSI open in another browser" popup if it appears
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const yes = btns.find(b => b.textContent.trim() === "Yes");
+      if (yes) { yes.click(); }
+    }).catch(() => {});
+    await page.waitForTimeout(3000);
+
     const pnsiPage = await page.evaluate(() => document.body.innerText);
     log("PNSI page: " + pnsiPage.substring(0, 150));
 
