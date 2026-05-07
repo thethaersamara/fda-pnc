@@ -44,14 +44,13 @@ app.post("/start-login", async (req, res) => {
   if (!sessionId || !fdaUsername || !fdaPassword)
     return res.status(400).json({ error: "sessionId, fdaUsername, fdaPassword required" });
 
-     try {
+  try {
     const { browser } = await createBrowser();
     const contexts = browser.contexts();
     const context = contexts.length > 0 ? contexts[0] : await browser.newContext();
     const page = await context.newPage();
 
-    await page.goto("https://www.access.fda.gov",
- { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto("https://www.access.fda.gov", { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(3000);
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("a, button"));
@@ -115,7 +114,6 @@ app.post("/start-login", async (req, res) => {
       return "Next not found";
     });
     console.log("Next button result:", clicked);
-    console.log("Waiting for Send Code ...");
     await page.waitForTimeout(5000);
 
     await page.waitForTimeout(5000);
@@ -186,13 +184,13 @@ app.post("/submit-pnc", async (req, res) => {
   const log = (msg) => { console.log("[PNC] " + msg); logs.push(msg); };
 
   try {
-    log("Navigating to PNSI...");
+    log("Navigating to PNSI dashboard...");
     await page.goto("https://www.access.fda.gov/pnsi-app/#/dashboard", { waitUntil: "domcontentloaded", timeout: 30000 });
     await page.waitForTimeout(5000);
-    const pnsiTitle = await page.evaluate(() => document.body.innerText);
-    log("PNSI page: " + pnsiTitle.substring(0, 150));
+    const pnsiPage = await page.evaluate(() => document.body.innerText);
+    log("PNSI page: " + pnsiPage.substring(0, 150));
 
-    if (!pnsiTitle.includes("Prior Notice") && !pnsiTitle.includes("PRIOR NOTICE")) {
+    if (!pnsiPage.includes("Prior Notice") && !pnsiPage.includes("PRIOR NOTICE")) {
       return res.status(401).json({ success: false, error: "Could not reach PNSI - please login again", logs });
     }
 
@@ -203,28 +201,6 @@ app.post("/submit-pnc", async (req, res) => {
       if (btn) btn.click();
     });
     await page.waitForTimeout(5000);
-    const afterCreate = await page.evaluate(() => document.body.innerText);
-    log("After Create click: " + afterCreate.substring(0, 150));
-
-
-    });
-
-    await page.waitForTimeout(3000);
-    const pnsiTitle = await page.evaluate(() => document.title);
-    log("PNSI page title: " + pnsiTitle);
-
-    // If redirected to login, session expired
-    if (pnsiTitle.toLowerCase().includes("login") || pnsiTitle.toLowerCase().includes("sign")) {
-      return res.status(401).json({ success: false, error: "Session expired - please login again", logs });
-    }
-
-    log("Clicking Create New Prior Notice...");
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("CREATE NEW PRIOR NOTICE") || b.textContent.includes("Create New Prior Notice"));
-      if (btn) btn.click();
-    });
-    await page.waitForTimeout(3000);
 
     log("Selecting shipment type...");
     await page.evaluate(() => {
@@ -312,7 +288,7 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(3000);
 
-             log("Submitter Details - Creating for Myself...");
+    log("Submitter Details - Creating for Myself...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
       const btn = btns.find(b => b.textContent.includes("Creating for Myself"));
@@ -320,45 +296,31 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-    // Log what page we're on after clicking Creating for Myself
-    const submitterPage = await page.evaluate(() => document.body.innerText);
-    log("Submitter form page: " + submitterPage.substring(0, 200));
-
-    // Click SAVE & CONTINUE to trigger address popup
     log("Clicking SAVE & CONTINUE on submitter page...");
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => {}),
-      page.evaluate(() => {
-        const btns = Array.from(document.querySelectorAll("button, a"));
-        const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
-        if (btn) btn.click();
-      })
-    ]);
-    await page.waitForTimeout(3000);
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
 
-
-        // Log page state before handling popup
     const beforePopup = await page.evaluate(() => document.body.innerText);
-    log("Page before popup handling: " + beforePopup.substring(0, 200));
+    log("Page before popup: " + beforePopup.substring(0, 150));
 
     const addressResult = await page.evaluate(() => {
       const radios = Array.from(document.querySelectorAll("input[type='radio']"));
-      const allRadioInfo = radios.map(r => r.value + "|" + (r.closest("label") || r.parentElement)?.textContent?.trim()?.substring(0, 50)).join(", ");
       const originalRadio = radios.find(r => {
         const parent = r.closest("label") || r.parentElement;
         return (parent && parent.textContent.includes("Original Address")) || r.value === "0";
       });
       if (originalRadio) { originalRadio.click(); }
       const btns = Array.from(document.querySelectorAll("button"));
-      const allBtns = btns.map(b => b.textContent.trim()).join(", ");
       const okBtn = btns.find(b => b.textContent.trim() === "Ok" || b.textContent.trim() === "OK");
-      if (okBtn) { okBtn.click(); return "Radios: " + allRadioInfo + " | Btns: " + allBtns; }
-      return "No Ok button | Radios: " + allRadioInfo + " | Btns: " + allBtns;
+      if (okBtn) { okBtn.click(); return "Clicked Original Address + Ok"; }
+      return "No popup found - buttons: " + btns.map(b => b.textContent.trim()).join(", ");
     });
-    log("Address popup: " + addressResult);
+    log("Address result: " + addressResult);
 
-
-    // Wait for navigation to Submission Overview
     await page.waitForLoadState("domcontentloaded").catch(() => {});
     await page.waitForTimeout(4000);
 
@@ -368,7 +330,7 @@ app.post("/submit-pnc", async (req, res) => {
     });
     log("Reached page: " + pageTitle);
 
-    res.json({ success: true, logs, status: "reached_food_article" });
+    res.json({ success: true, logs, status: "reached_submission_overview" });
 
   } catch (err) {
     log("ERROR: " + err.message);
