@@ -186,7 +186,8 @@ app.post("/submit-pnc", async (req, res) => {
   try {
     log("Navigating to PNSI dashboard...");
     await page.goto("https://www.access.fda.gov/pnsi-app/#/dashboard", { waitUntil: "domcontentloaded", timeout: 30000 });
-        await page.waitForTimeout(8000);
+    await page.waitForFunction(() => document.body.innerText.trim().length > 100, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(3000);
 
     // Handle "PNSI open in another browser" popup if it appears
     await page.evaluate(() => {
