@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { chromium } = require("playwright-core");
+const { chromium } = require("playwright-core"); 
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -200,8 +200,17 @@ app.post("/submit-pnc", async (req, res) => {
     // Click Prior Notice System Interface link
     await page.evaluate(() => {
       const links = Array.from(document.querySelectorAll("a"));
-      const link = links.find(l => l.textContent.includes("Prior Notice System Interface"));
-      if (link) link.click();
+      // Find the PNSI link that is NOT in the footer
+      const link = links.find(l => 
+        l.textContent.trim() === "Prior Notice System Interface" &&
+        !l.closest("footer") &&
+        l.getBoundingClientRect().top < window.innerHeight
+      );
+      if (link) { link.click(); return; }
+      // Fallback: click first match
+      const fallback = links.find(l => l.textContent.includes("Prior Notice System Interface"));
+      if (fallback) fallback.click();
+
     });
     await page.waitForTimeout(8000);
 
