@@ -147,14 +147,28 @@ app.post("/submit-otp", async (req, res) => {
     return res.status(404).json({ error: "Session not found or expired" });
 
   try {
-    await safeFill(session.page, "input[placeholder='Enter Code Here'], input[name='otp'], input[name='code'], input[type='text']", otp);
-    await session.page.waitForTimeout(500);
+      // Focus and type OTP using keyboard like we do for password
+    const otpFocused = await session.page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll("input"));
+      const visibleInput = inputs.find(i => {
+        const rect = i.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      if (visibleInput) { visibleInput.focus(); visibleInput.click(); return "Focused"; }
+      return "No input found";
+    });
+    console.log("OTP input focus:", otpFocused);
+    await session.page.keyboard.press("Control+A");
+    await session.page.keyboard.press("Backspace");
+    await session.page.keyboard.type(otp, { delay: 150 });
+    await session.page.waitForTimeout(1000);
 
     await session.page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a, input[type='submit']"));
       const btn = btns.find(b => b.textContent.toLowerCase().includes("submit code") || b.textContent.toLowerCase().includes("submit"));
       if (btn) btn.click();
     });
+
     await session.page.waitForTimeout(3000);
 
         await session.page.evaluate(() => {
