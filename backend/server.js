@@ -183,35 +183,24 @@ app.post("/submit-pnc", async (req, res) => {
   const logs = [];
   const log = (msg) => { console.log("[PNC] " + msg); logs.push(msg); };
 
-  try {        log("Navigating to PNSI...");
-    // Current page should be OAA after login - wait for it
-    await page.waitForFunction(() =>
-      document.body.innerText.includes("Prior Notice System Interface"),
-      { timeout: 10000 }
-    ).catch(async () => {
-      // Fallback: go to OAA account management directly
-      await page.goto("https://www.access.fda.gov/oaa/accountManagement.html", { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.waitForTimeout(5000);
-    });
-
-    const oaaPage = await page.evaluate(() => document.body.innerText);
-    log("OAA page: " + oaaPage.substring(0, 150));
+     try {
+ log("Navigating to PNSI...");
+    // After OTP login we're already on OAA - just wait for it to fully load
+    await page.waitForTimeout(5000);
+    const currentPage = await page.evaluate(() => document.body.innerText);
+    log("Current page: " + currentPage.substring(0, 150));
 
     // Click Prior Notice System Interface link
-    await page.evaluate(() => {
+    const clicked = await page.evaluate(() => {
       const links = Array.from(document.querySelectorAll("a"));
-      // Find the PNSI link that is NOT in the footer
       const link = links.find(l => 
         l.textContent.trim() === "Prior Notice System Interface" &&
-        !l.closest("footer") &&
-        l.getBoundingClientRect().top < window.innerHeight
+        !l.closest("footer")
       );
-      if (link) { link.click(); return; }
-      // Fallback: click first match
-      const fallback = links.find(l => l.textContent.includes("Prior Notice System Interface"));
-      if (fallback) fallback.click();
-
+      if (link) { link.click(); return "Clicked PNSI link"; }
+      return "PNSI link not found";
     });
+    log("PNSI click: " + clicked);
     await page.waitForTimeout(8000);
 
     // Handle "PNSI open in another browser" popup
