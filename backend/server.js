@@ -157,12 +157,21 @@ app.post("/submit-otp", async (req, res) => {
     });
     await session.page.waitForTimeout(3000);
 
-    await session.page.evaluate(() => {
+        await session.page.evaluate(() => {
       const links = Array.from(document.querySelectorAll("a, button"));
       const btn = links.find(b => b.textContent.toLowerCase().includes("continue with password"));
       if (btn) btn.click();
     }).catch(() => {});
+    
+    // Wait for OAA page to load fully
+    await session.page.waitForFunction(() => 
+      document.body.innerText.includes("Prior Notice System Interface"),
+      { timeout: 30000 }
+    ).catch(() => {});
     await session.page.waitForTimeout(2000);
+    
+    const afterLogin = await session.page.evaluate(() => document.body.innerText);
+    console.log("Page after OTP login: " + afterLogin.substring(0, 200));
 
     session.status = "logged_in";
     res.json({ success: true, status: "logged_in" });
