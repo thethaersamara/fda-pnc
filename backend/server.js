@@ -147,6 +147,17 @@ app.post("/submit-otp", async (req, res) => {
     return res.status(404).json({ error: "Session not found or expired" });
 
   try {
+    // Log OTP page state first
+    const otpPageContent = await session.page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll("input")).map(i => i.type + "|" + i.id + "|" + i.placeholder);
+      const btns = Array.from(document.querySelectorAll("button")).map(b => b.textContent.trim() + "|disabled:" + b.disabled);
+      return "INPUTS: " + inputs.join(", ") + " || BUTTONS: " + btns.join(", ");
+    });
+    console.log("OTP page state:", otpPageContent);
+
+    // Focus and type OTP using keyboard like we do for password
+    const otpFocused = await session.page.evaluate(() => {
+
       // Focus and type OTP using keyboard like we do for password
     const otpFocused = await session.page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll("input"));
