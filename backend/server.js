@@ -350,19 +350,23 @@ app.post("/submit-pnc", async (req, res) => {
     log("After carrier save: " + afterCarrier.substring(0, 100));
 
 
-    log("Submitter Details - Creating for Myself...");
+        log("Submitter Details - Creating for Myself...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("Creating for Myself"));
+      const btn = btns.find(b => b.textContent.trim() === "Creating for Myself");
       if (btn) btn.click();
     });
     await page.waitForTimeout(5000);
 
+    const afterMyself = await page.evaluate(() => document.body.innerText);
+    log("After Creating for Myself: " + afterMyself.substring(0, 150));
+
     log("Clicking SAVE & CONTINUE on submitter page...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
-      if (btn) btn.click();
+      // Find the LAST Save & Continue (the one at bottom of submitter form)
+      const allBtns = btns.filter(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
+      if (allBtns.length > 0) allBtns[allBtns.length - 1].click();
     });
     await page.waitForTimeout(5000);
 
