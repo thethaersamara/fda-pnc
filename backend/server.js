@@ -418,14 +418,17 @@ app.post("/submit-pnc", async (req, res) => {
     const afterCopy = await page.evaluate(() => document.body.innerText);
     log("After Copy from Previous: " + afterCopy.substring(0, 150));
 
-    // Select first checkbox
+        // Select ONLY the first food article checkbox
     log("Selecting food article checkbox...");
     await page.evaluate(() => {
       const checkboxes = Array.from(document.querySelectorAll("input[type='checkbox']"));
-      const first = checkboxes.find(c => !c.checked);
-      if (first) first.click();
+      // Uncheck all first
+      checkboxes.forEach(c => { if (c.checked) c.click(); });
+      // Check only the first one
+      if (checkboxes.length > 1) checkboxes[1].click();
     });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
+
 
     // Click "COPY FOOD ARTICLE(S) TO PRIOR NOTICE"
     log("Clicking Copy Food Articles button...");
@@ -447,8 +450,13 @@ app.post("/submit-pnc", async (req, res) => {
     const afterConfirm = await page.evaluate(() => document.body.innerText);
     log("After Confirm: " + afterConfirm.substring(0, 150));
 
-     // Click third pencil icon (in Food Articles table)
+         // Wait for mat-icons to load then click pencil
     log("Clicking pencil to edit article...");
+    await page.waitForFunction(() => {
+      const icons = Array.from(document.querySelectorAll("mat-icon"));
+      return icons.filter(i => i.textContent.trim() === "edit").length > 0;
+    }, { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(1000);
     const pencilClicked = await page.evaluate(() => {
       const matIcons = Array.from(document.querySelectorAll("mat-icon"));
       const editIcons = matIcons.filter(i => i.textContent.trim() === "edit");
