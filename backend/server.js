@@ -450,30 +450,30 @@ app.post("/submit-pnc", async (req, res) => {
     const afterConfirm = await page.evaluate(() => document.body.innerText);
     log("After Confirm: " + afterConfirm.substring(0, 150));
 
-               // Click pencil in food articles table Actions column
+                   // Click pencil in the In Progress food article row
     log("Clicking pencil to edit article...");
     await page.waitForTimeout(3000);
     const pencilClicked = await page.evaluate(() => {
-      // Log all buttons to understand the structure
-      const btns = Array.from(document.querySelectorAll("button"));
-      const btnInfo = btns.map((b, i) => i + ":" + b.className.substring(0, 30) + "|" + b.textContent.trim().substring(0, 20)).join(", ");
-      console.log("All buttons:", btnInfo);
-      
-      // Find buttons that are inside a table row (tr) specifically
       const tableRows = Array.from(document.querySelectorAll("tr"));
       for (const row of tableRows) {
-        const rowBtns = Array.from(row.querySelectorAll("button"));
-        if (rowBtns.length > 0) {
-          rowBtns[0].click();
-          return "Clicked first button in table row, row text: " + row.textContent.trim().substring(0, 50);
+        if (row.textContent.includes("In Progress")) {
+          const btns = Array.from(row.querySelectorAll("button, a"));
+          // Log all buttons in this row
+          const btnInfo = btns.map((b, i) => i + ":" + b.innerHTML.substring(0, 50)).join(" | ");
+          console.log("Buttons in In Progress row:", btnInfo);
+          // Click the first button (should be pencil/edit)
+          if (btns.length > 0) {
+            btns[0].click();
+            return "Clicked btn[0] in In Progress row, total btns: " + btns.length + " | " + btnInfo.substring(0, 100);
+          }
         }
       }
-      return "No table row buttons found | " + btnInfo.substring(0, 200);
+      return "No In Progress row found";
     });
     log("Pencil click result: " + pencilClicked);
     await page.waitForTimeout(5000);
     const afterPencil = await page.evaluate(() => document.body.innerText);
-    log("After pencil: " + afterPencil.substring(0, 100));
+    log("After pencil: " + afterPencil.substring(0, 150));
 
 
 
