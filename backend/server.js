@@ -450,26 +450,32 @@ app.post("/submit-pnc", async (req, res) => {
     const afterConfirm = await page.evaluate(() => document.body.innerText);
     log("After Confirm: " + afterConfirm.substring(0, 150));
 
-         // Wait for mat-icons to load then click pencil
+           // Wait for table to load then click pencil button in Actions column
     log("Clicking pencil to edit article...");
-    await page.waitForFunction(() => {
-      const icons = Array.from(document.querySelectorAll("mat-icon"));
-      return icons.filter(i => i.textContent.trim() === "edit").length > 0;
-    }, { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(3000);
     const pencilClicked = await page.evaluate(() => {
-      const matIcons = Array.from(document.querySelectorAll("mat-icon"));
-      const editIcons = matIcons.filter(i => i.textContent.trim() === "edit");
-      // Click the third one (index 2)
-      const third = editIcons[2];
-      if (third) {
-        const btn = third.closest("button, a");
-        if (btn) { btn.click(); return "Clicked 3rd edit icon"; }
+      // Try multiple approaches
+      // 1. Find button with mat-icon inside in a table cell
+      const cells = Array.from(document.querySelectorAll("td, mat-cell"));
+      for (const cell of cells) {
+        const btn = cell.querySelector("button, a");
+        if (btn && (btn.innerHTML.includes("edit") || btn.querySelector("mat-icon"))) {
+          btn.click();
+          return "Clicked button in table cell";
+        }
       }
-      return "3rd edit icon not found, total: " + editIcons.length;
+      // 2. Find any button that has only an icon (likely action buttons)
+      const btns = Array.from(document.querySelectorAll("button"));
+      const iconBtns = btns.filter(b => b.querySelector("mat-icon, i") && b.textContent.trim().length < 10);
+      if (iconBtns.length >= 1) {
+        iconBtns[0].click();
+        return "Clicked first icon button, total icon buttons: " + iconBtns.length;
+      }
+      return "No button found, all buttons: " + btns.map(b => b.className + "|" + b.textContent.trim().substring(0, 20)).join(", ");
     });
     log("Pencil click result: " + pencilClicked);
     await page.waitForTimeout(5000);
+
 
 
     // Click "Review" in sidebar
