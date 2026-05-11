@@ -147,23 +147,12 @@ app.post("/submit-otp", async (req, res) => {
     return res.status(404).json({ error: "Session not found or expired" });
 
   try {
-    // Log OTP page state first
-    const otpPageContent = await session.page.evaluate(() => {
-      const inputs = Array.from(document.querySelectorAll("input")).map(i => i.type + "|" + i.id + "|" + i.placeholder);
-      const btns = Array.from(document.querySelectorAll("button")).map(b => b.textContent.trim() + "|disabled:" + b.disabled);
-      return "INPUTS: " + inputs.join(", ") + " || BUTTONS: " + btns.join(", ");
-    });
-    console.log("OTP page state:", otpPageContent);
-
-    // Focus and type OTP using keyboard
+    // Focus the OTP input field specifically
     const otpFocused = await session.page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll("input"));
-      const visibleInput = inputs.find(i => {
-        const rect = i.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      });
-      if (visibleInput) { visibleInput.focus(); visibleInput.click(); return "Focused"; }
-      return "No input found";
+      const otpInput = inputs.find(i => i.placeholder === "Enter Code Here");
+      if (otpInput) { otpInput.focus(); otpInput.click(); return "Focused OTP field"; }
+      return "OTP field not found";
     });
     console.log("OTP input focus:", otpFocused);
     await session.page.keyboard.press("Control+A");
@@ -171,20 +160,16 @@ app.post("/submit-otp", async (req, res) => {
     await session.page.keyboard.type(otp, { delay: 150 });
     await session.page.waitForTimeout(1000);
 
-    // Try pressing Enter first
-    await session.page.keyboard.press("Enter");
-    await session.page.waitForTimeout(2000);
-
-    // Also try clicking Submit Code button
+    // Click Submit Code button
     await session.page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a, input[type='submit']"));
-      const btn = btns.find(b => b.textContent.toLowerCase().includes("submit code") || b.textContent.toLowerCase().includes("submit"));
+      const btns = Array.from(document.querySelectorAll("button"));
+      const btn = btns.find(b => b.textContent.trim() === "Submit Code");
       if (btn) btn.click();
     });
     await session.page.waitForTimeout(3000);
 
     const afterOtp = await session.page.evaluate(() => document.body.innerText);
-    console.log("Page after Submit Code click:", afterOtp.substring(0, 200));
+    console.log("Page after Submit Code:", afterOtp.substring(0, 200));
 
     // Click "Continue with Password" to skip passkey
     await session.page.evaluate(() => {
