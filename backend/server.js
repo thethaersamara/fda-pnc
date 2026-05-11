@@ -155,8 +155,7 @@ app.post("/submit-otp", async (req, res) => {
     });
     console.log("OTP page state:", otpPageContent);
 
-  try {
-      // Focus and type OTP using keyboard like we do for password
+    // Focus and type OTP using keyboard
     const otpFocused = await session.page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll("input"));
       const visibleInput = inputs.find(i => {
@@ -172,29 +171,37 @@ app.post("/submit-otp", async (req, res) => {
     await session.page.keyboard.type(otp, { delay: 150 });
     await session.page.waitForTimeout(1000);
 
+    // Try pressing Enter first
+    await session.page.keyboard.press("Enter");
+    await session.page.waitForTimeout(2000);
+
+    // Also try clicking Submit Code button
     await session.page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a, input[type='submit']"));
       const btn = btns.find(b => b.textContent.toLowerCase().includes("submit code") || b.textContent.toLowerCase().includes("submit"));
       if (btn) btn.click();
     });
-
     await session.page.waitForTimeout(3000);
 
-        await session.page.evaluate(() => {
+    const afterOtp = await session.page.evaluate(() => document.body.innerText);
+    console.log("Page after Submit Code click:", afterOtp.substring(0, 200));
+
+    // Click "Continue with Password" to skip passkey
+    await session.page.evaluate(() => {
       const links = Array.from(document.querySelectorAll("a, button"));
       const btn = links.find(b => b.textContent.toLowerCase().includes("continue with password"));
       if (btn) btn.click();
     }).catch(() => {});
-    
-    // Wait for OAA page to load fully
-    await session.page.waitForFunction(() => 
+
+    // Wait for OAA page to load
+    await session.page.waitForFunction(() =>
       document.body.innerText.includes("Prior Notice System Interface"),
       { timeout: 30000 }
     ).catch(() => {});
     await session.page.waitForTimeout(2000);
-    
+
     const afterLogin = await session.page.evaluate(() => document.body.innerText);
-    console.log("Page after OTP login: " + afterLogin.substring(0, 200));
+    console.log("Page after OTP login:", afterLogin.substring(0, 200));
 
     session.status = "logged_in";
     res.json({ success: true, status: "logged_in" });
@@ -203,6 +210,7 @@ app.post("/submit-otp", async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 app.post("/submit-pnc", async (req, res) => {
   const { sessionId, invoice } = req.body;
