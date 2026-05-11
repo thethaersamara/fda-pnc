@@ -331,12 +331,17 @@ app.post("/submit-pnc", async (req, res) => {
     }, dateStr);
     await page.waitForTimeout(500);
 
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
-      if (btn) btn.click();
-    });
+       await Promise.all([
+      page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => {}),
+      page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll("button, a"));
+        const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
+        if (btn) btn.click();
+      })
+    ]);
     await page.waitForTimeout(3000);
+    const afterCarrier = await page.evaluate(() => document.body.innerText);
+    log("After carrier save: " + afterCarrier.substring(0, 100));
 
     log("Submitter Details - Creating for Myself...");
     await page.evaluate(() => {
