@@ -450,31 +450,31 @@ app.post("/submit-pnc", async (req, res) => {
     const afterConfirm = await page.evaluate(() => document.body.innerText);
     log("After Confirm: " + afterConfirm.substring(0, 150));
 
-           // Wait for table to load then click pencil button in Actions column
+               // Click pencil in food articles table Actions column
     log("Clicking pencil to edit article...");
     await page.waitForTimeout(3000);
     const pencilClicked = await page.evaluate(() => {
-      // Try multiple approaches
-      // 1. Find button with mat-icon inside in a table cell
-      const cells = Array.from(document.querySelectorAll("td, mat-cell"));
-      for (const cell of cells) {
-        const btn = cell.querySelector("button, a");
-        if (btn && (btn.innerHTML.includes("edit") || btn.querySelector("mat-icon"))) {
-          btn.click();
-          return "Clicked button in table cell";
+      // Log all buttons to understand the structure
+      const btns = Array.from(document.querySelectorAll("button"));
+      const btnInfo = btns.map((b, i) => i + ":" + b.className.substring(0, 30) + "|" + b.textContent.trim().substring(0, 20)).join(", ");
+      console.log("All buttons:", btnInfo);
+      
+      // Find buttons that are inside a table row (tr) specifically
+      const tableRows = Array.from(document.querySelectorAll("tr"));
+      for (const row of tableRows) {
+        const rowBtns = Array.from(row.querySelectorAll("button"));
+        if (rowBtns.length > 0) {
+          rowBtns[0].click();
+          return "Clicked first button in table row, row text: " + row.textContent.trim().substring(0, 50);
         }
       }
-      // 2. Find any button that has only an icon (likely action buttons)
-      const btns = Array.from(document.querySelectorAll("button"));
-      const iconBtns = btns.filter(b => b.querySelector("mat-icon, i") && b.textContent.trim().length < 10);
-      if (iconBtns.length >= 1) {
-        iconBtns[0].click();
-        return "Clicked first icon button, total icon buttons: " + iconBtns.length;
-      }
-      return "No button found, all buttons: " + btns.map(b => b.className + "|" + b.textContent.trim().substring(0, 20)).join(", ");
+      return "No table row buttons found | " + btnInfo.substring(0, 200);
     });
     log("Pencil click result: " + pencilClicked);
     await page.waitForTimeout(5000);
+    const afterPencil = await page.evaluate(() => document.body.innerText);
+    log("After pencil: " + afterPencil.substring(0, 100));
+
 
 
 
