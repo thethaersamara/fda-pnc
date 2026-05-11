@@ -396,7 +396,98 @@ app.post("/submit-pnc", async (req, res) => {
     });
     log("Reached page: " + pageTitle);
 
-    res.json({ success: true, logs, status: "reached_submission_overview" });
+    // Step: Add Food Article
+    log("Adding food article...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("ADD FOOD ARTICLE"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+
+    // Click "Copy from a Previous Food Article"
+    log("Copying from previous food article...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("Copy from a Previous Food Article"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+
+    // Select first checkbox (first food article)
+    log("Selecting food article...");
+    await page.evaluate(() => {
+      const checkboxes = Array.from(document.querySelectorAll("input[type='checkbox']"));
+      const first = checkboxes.find(c => !c.checked);
+      if (first) first.click();
+    });
+    await page.waitForTimeout(1000);
+
+    // Click "COPY FOOD ARTICLE(S) TO PRIOR NOTICE"
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("COPY FOOD ARTICLE") || b.textContent.includes("Copy Food Article"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(3000);
+
+    // Click "CONFIRM" on popup
+    log("Confirming food article copy...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button"));
+      const btn = btns.find(b => b.textContent.trim() === "CONFIRM" || b.textContent.trim() === "Confirm");
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+
+    // Click pencil icon to edit article
+    log("Editing food article...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.querySelector("i.fa-pencil, i.fa-edit, .pencil") || 
+                                  b.className.includes("pencil") || b.className.includes("edit") ||
+                                  b.innerHTML.includes("pencil") || b.innerHTML.includes("edit"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(3000);
+
+    // Click "Review" in sidebar
+    log("Clicking Review...");
+    await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll("a, button"));
+      const link = links.find(l => l.textContent.trim() === "Review");
+      if (link) link.click();
+    });
+    await page.waitForTimeout(3000);
+
+    // Click "ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION"
+    log("Adding article to submission...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION") || 
+                                  b.textContent.includes("Add this article to my Prior Notice"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+
+    // Click "SUBMIT TO FDA"
+    log("Submitting to FDA...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("SUBMIT TO FDA") || b.textContent.includes("Submit to FDA"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+
+    const finalPage = await page.evaluate(() => document.body.innerText);
+    log("Final page: " + finalPage.substring(0, 200));
+
+    const confirmMatch = finalPage.match(/[A-Z0-9]{2}\d{9,}/);
+    const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
+    log("Confirmation: " + confirmationNumber);
+
+    res.json({ success: true, logs, confirmationNumber, status: "submitted" });
+
 
   } catch (err) {
     log("ERROR: " + err.message);
