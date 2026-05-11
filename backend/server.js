@@ -155,9 +155,7 @@ app.post("/submit-otp", async (req, res) => {
     });
     console.log("OTP page state:", otpPageContent);
 
-    // Focus and type OTP using keyboard like we do for password
-    const otpFocused = await session.page.evaluate(() => {
-
+  try {
       // Focus and type OTP using keyboard like we do for password
     const otpFocused = await session.page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll("input"));
