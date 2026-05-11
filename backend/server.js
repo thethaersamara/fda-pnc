@@ -396,7 +396,7 @@ app.post("/submit-pnc", async (req, res) => {
     });
     log("Reached page: " + pageTitle);
 
-    // Step: Add Food Article
+        // Step: Add Food Article
     log("Adding food article...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
@@ -404,6 +404,8 @@ app.post("/submit-pnc", async (req, res) => {
       if (btn) btn.click();
     });
     await page.waitForTimeout(5000);
+    const afterAddFood = await page.evaluate(() => document.body.innerText);
+    log("After ADD FOOD ARTICLE: " + afterAddFood.substring(0, 100));
 
     // Click "Copy from a Previous Food Article"
     log("Copying from previous food article...");
@@ -412,18 +414,21 @@ app.post("/submit-pnc", async (req, res) => {
       const btn = btns.find(b => b.textContent.includes("Copy from a Previous Food Article"));
       if (btn) btn.click();
     });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(8000);
+    const afterCopy = await page.evaluate(() => document.body.innerText);
+    log("After Copy from Previous: " + afterCopy.substring(0, 150));
 
-    // Select first checkbox (first food article)
-    log("Selecting food article...");
+    // Select first checkbox
+    log("Selecting food article checkbox...");
     await page.evaluate(() => {
       const checkboxes = Array.from(document.querySelectorAll("input[type='checkbox']"));
       const first = checkboxes.find(c => !c.checked);
       if (first) first.click();
     });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
     // Click "COPY FOOD ARTICLE(S) TO PRIOR NOTICE"
+    log("Clicking Copy Food Articles button...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
       const btn = btns.find(b => b.textContent.includes("COPY FOOD ARTICLE") || b.textContent.includes("Copy Food Article"));
@@ -431,25 +436,28 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(3000);
 
-    // Click "CONFIRM" on popup
-    log("Confirming food article copy...");
+    // Click "CONFIRM"
+    log("Confirming...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button"));
       const btn = btns.find(b => b.textContent.trim() === "CONFIRM" || b.textContent.trim() === "Confirm");
       if (btn) btn.click();
     });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(8000);
+    const afterConfirm = await page.evaluate(() => document.body.innerText);
+    log("After Confirm: " + afterConfirm.substring(0, 150));
 
     // Click pencil icon to edit article
-    log("Editing food article...");
+    log("Clicking pencil to edit article...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.querySelector("i.fa-pencil, i.fa-edit, .pencil") || 
-                                  b.className.includes("pencil") || b.className.includes("edit") ||
-                                  b.innerHTML.includes("pencil") || b.innerHTML.includes("edit"));
+      const btn = btns.find(b => b.innerHTML.includes("pencil") || b.innerHTML.includes("edit") || 
+                                  b.className.includes("pencil") || b.title?.includes("Edit"));
       if (btn) btn.click();
     });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
+    const afterPencil = await page.evaluate(() => document.body.innerText);
+    log("After pencil click: " + afterPencil.substring(0, 100));
 
     // Click "Review" in sidebar
     log("Clicking Review...");
@@ -458,17 +466,21 @@ app.post("/submit-pnc", async (req, res) => {
       const link = links.find(l => l.textContent.trim() === "Review");
       if (link) link.click();
     });
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
+    const afterReview = await page.evaluate(() => document.body.innerText);
+    log("After Review click: " + afterReview.substring(0, 100));
 
     // Click "ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION"
     log("Adding article to submission...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION") || 
+      const btn = btns.find(b => b.textContent.includes("ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION") ||
                                   b.textContent.includes("Add this article to my Prior Notice"));
       if (btn) btn.click();
     });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(8000);
+    const afterAddArticle = await page.evaluate(() => document.body.innerText);
+    log("After add article: " + afterAddArticle.substring(0, 150));
 
     // Click "SUBMIT TO FDA"
     log("Submitting to FDA...");
@@ -477,16 +489,17 @@ app.post("/submit-pnc", async (req, res) => {
       const btn = btns.find(b => b.textContent.includes("SUBMIT TO FDA") || b.textContent.includes("Submit to FDA"));
       if (btn) btn.click();
     });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(8000);
 
     const finalPage = await page.evaluate(() => document.body.innerText);
-    log("Final page: " + finalPage.substring(0, 200));
+    log("Final page: " + finalPage.substring(0, 300));
 
     const confirmMatch = finalPage.match(/[A-Z0-9]{2}\d{9,}/);
     const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
     log("Confirmation: " + confirmationNumber);
 
     res.json({ success: true, logs, confirmationNumber, status: "submitted" });
+
 
 
   } catch (err) {
