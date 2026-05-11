@@ -447,33 +447,30 @@ app.post("/submit-pnc", async (req, res) => {
     const afterConfirm = await page.evaluate(() => document.body.innerText);
     log("After Confirm: " + afterConfirm.substring(0, 150));
 
-        // Click pencil icon to edit article - it's in the food articles table
+            // Click pencil icon in the food articles table
     log("Clicking pencil to edit article...");
     const pencilClicked = await page.evaluate(() => {
-      // Log all buttons with their HTML to find the pencil
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const allBtns = btns.map(b => b.outerHTML.substring(0, 100)).join(" | ");
-      console.log("All buttons HTML:", allBtns.substring(0, 500));
-      
-      // Try mat-icon pencil button
-      const matPencil = document.querySelector("button mat-icon, a mat-icon");
-      if (matPencil && matPencil.textContent.includes("edit")) {
-        matPencil.closest("button, a").click();
-        return "Clicked mat-icon pencil";
+      // Find the edit button specifically in the food articles actions column
+      const rows = Array.from(document.querySelectorAll("tr, mat-row"));
+      for (const row of rows) {
+        const btns = Array.from(row.querySelectorAll("button, a"));
+        const pencil = btns.find(b => 
+          b.innerHTML.includes("edit") || 
+          b.querySelector("mat-icon")?.textContent?.trim() === "edit"
+        );
+        if (pencil) { pencil.click(); return "Clicked pencil in row"; }
       }
-      // Try any button with edit/pencil in class or content
-      const btn = btns.find(b => 
-        b.querySelector("i") || 
-        b.textContent.trim() === "edit" ||
-        b.innerHTML.toLowerCase().includes("edit") ||
-        b.innerHTML.toLowerCase().includes("pencil")
-      );
-      if (btn) { btn.click(); return "Clicked: " + btn.outerHTML.substring(0, 100); }
-      return "No pencil found";
+      // Fallback: find all mat-icons with text "edit"
+      const matIcons = Array.from(document.querySelectorAll("mat-icon"));
+      const editIcon = matIcons.find(i => i.textContent.trim() === "edit");
+      if (editIcon) {
+        const btn = editIcon.closest("button, a");
+        if (btn) { btn.click(); return "Clicked via mat-icon edit"; }
+      }
+      return "Pencil not found";
     });
     log("Pencil click result: " + pencilClicked);
     await page.waitForTimeout(5000);
-
     const afterPencil = await page.evaluate(() => document.body.innerText);
     log("After pencil click: " + afterPencil.substring(0, 100));
 
