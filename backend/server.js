@@ -447,32 +447,22 @@ app.post("/submit-pnc", async (req, res) => {
     const afterConfirm = await page.evaluate(() => document.body.innerText);
     log("After Confirm: " + afterConfirm.substring(0, 150));
 
-            // Click pencil icon in the food articles table
+     // Click third pencil icon (in Food Articles table)
     log("Clicking pencil to edit article...");
     const pencilClicked = await page.evaluate(() => {
-      // Find the edit button specifically in the food articles actions column
-      const rows = Array.from(document.querySelectorAll("tr, mat-row"));
-      for (const row of rows) {
-        const btns = Array.from(row.querySelectorAll("button, a"));
-        const pencil = btns.find(b => 
-          b.innerHTML.includes("edit") || 
-          b.querySelector("mat-icon")?.textContent?.trim() === "edit"
-        );
-        if (pencil) { pencil.click(); return "Clicked pencil in row"; }
-      }
-      // Fallback: find all mat-icons with text "edit"
       const matIcons = Array.from(document.querySelectorAll("mat-icon"));
-      const editIcon = matIcons.find(i => i.textContent.trim() === "edit");
-      if (editIcon) {
-        const btn = editIcon.closest("button, a");
-        if (btn) { btn.click(); return "Clicked via mat-icon edit"; }
+      const editIcons = matIcons.filter(i => i.textContent.trim() === "edit");
+      // Click the third one (index 2)
+      const third = editIcons[2];
+      if (third) {
+        const btn = third.closest("button, a");
+        if (btn) { btn.click(); return "Clicked 3rd edit icon"; }
       }
-      return "Pencil not found";
+      return "3rd edit icon not found, total: " + editIcons.length;
     });
     log("Pencil click result: " + pencilClicked);
     await page.waitForTimeout(5000);
-    const afterPencil = await page.evaluate(() => document.body.innerText);
-    log("After pencil click: " + afterPencil.substring(0, 100));
+
 
     // Click "Review" in sidebar
     log("Clicking Review...");
@@ -485,7 +475,7 @@ app.post("/submit-pnc", async (req, res) => {
     const afterReview = await page.evaluate(() => document.body.innerText);
     log("After Review click: " + afterReview.substring(0, 100));
 
-    // Click "ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION"
+        // Click "ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION"
     log("Adding article to submission...");
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
@@ -493,9 +483,19 @@ app.post("/submit-pnc", async (req, res) => {
                                   b.textContent.includes("Add this article to my Prior Notice"));
       if (btn) btn.click();
     });
-    await page.waitForTimeout(8000);
-    const afterAddArticle = await page.evaluate(() => document.body.innerText);
-    log("After add article: " + afterAddArticle.substring(0, 150));
+    await page.waitForTimeout(5000);
+
+    // Handle "Add Article Confirmation" popup - click "No, Done creating Food Articles"
+    log("Handling Add Article Confirmation popup...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("No, Done creating Food Articles"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+    const afterDone = await page.evaluate(() => document.body.innerText);
+    log("After Done: " + afterDone.substring(0, 100));
+
 
     // Click "SUBMIT TO FDA"
     log("Submitting to FDA...");
