@@ -553,37 +553,44 @@ app.post("/submit-pnc", async (req, res) => {
     const afterDone = await page.evaluate(() => document.body.innerText);
     log("After Done: " + afterDone.substring(0, 150));
 
+         await page.waitForTimeout(5000);
 
+    // Wait for food article status to change to "Added to Prior Notice"
+    log("Waiting for food article to be Added to Prior Notice...");
+    await page.waitForFunction(() => 
+      document.body.innerText.includes("Added to Prior Notice"),
+      { timeout: 15000 }
+    ).catch(() => {});
+    
+    const beforeSubmit = await page.evaluate(() => document.body.innerText);
+    log("Before submit status: " + beforeSubmit.substring(0, 300));
 
-        // Click "SUBMIT TO FDA"
+    // Click "SUBMIT TO FDA"
     log("Submitting to FDA...");
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
     const submitClicked = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
       const btn = btns.find(b => b.textContent.toLowerCase().includes("submit to fda"));
-      if (btn) { 
-        btn.scrollIntoView(); 
-        btn.click(); 
-        return "Clicked: " + btn.textContent.trim(); 
-      }
+      if (btn) { btn.scrollIntoView(); btn.click(); return "Clicked: " + btn.textContent.trim(); }
       return "Not found, buttons: " + btns.map(b => b.textContent.trim().substring(0, 25)).filter(t => t).join(", ");
     });
     log("Submit to FDA result: " + submitClicked);
-    await page.waitForTimeout(10000);
+    await page.waitForTimeout(3000);
 
-    const finalPage = await page.evaluate(() => document.body.innerText);
-    log("Final page: " + finalPage.substring(0, 300));
+    // Handle confirmation popup
+    const submitPopup = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const confirmBtn = btns.find(b => 
+        b.textContent.toLowerCase().includes("confirm") ||
+        b.textContent.toLowerCase().includes("yes") ||
+        b.textContent.toLowerCase().includes("ok")
+      );
+      if (confirmBtn) { confirmBtn.click(); return "Clicked: " + confirmBtn.textContent.trim(); }
+      return "No popup";
+    });
+    log("Submit popup: " + submitPopup);
+    await page.waitForTimeout(8000);
 
-    const confirmMatch = finalPage.match(/\d{12}/);
-    const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
-    log("Confirmation: " + confirmationNumber);
-
-    res.json({ success: true, logs, confirmationNumber, status: "submitted" });
-
-  } catch (err) {
-    log("ERROR: " + err.message);
-    res.status(500).json({ success: false, error: err.message, logs });
-  }
 });
 app.post("/submit-all-pnc", async (req, res) => {
   const { sessionId, invoices } = req.body;
