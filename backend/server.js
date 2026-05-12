@@ -268,7 +268,9 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(3000);
 
-       log("Filling Carrier details...");
+           log("Filling Carrier details...");
+    await page.waitForTimeout(2000);
+
     // Click Air button
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
@@ -277,81 +279,81 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(2000);
 
-    // Select Express Courier - Air from dropdown
-    await page.evaluate(() => {
-      const selects = Array.from(document.querySelectorAll("select"));
-      for (const sel of selects) {
-        const opt = Array.from(sel.options).find(o => o.text.includes("Express Courier - Air"));
-        if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
-      }
+    // Select Express Courier - Air
+    await page.select("select[name='modeOfTransportation']", "EC").catch(async () => {
+      await page.evaluate(() => {
+        const sel = document.querySelector("select[name='modeOfTransportation']");
+        if (sel) {
+          const opt = Array.from(sel.options).find(o => o.text.includes("Express Courier - Air"));
+          if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+        }
+      });
     });
     await page.waitForTimeout(1000);
 
-    // Type IATA code FX
-    const iataInput = await page.$("input[placeholder*='IATA'], input[placeholder*='iata']");
-    if (iataInput) {
-      await iataInput.click({ clickCount: 3 });
-      await iataInput.type("FX", { delay: 100 });
-      await page.waitForTimeout(500);
-      // Click Find Code button
-      await page.evaluate(() => {
-        const btns = Array.from(document.querySelectorAll("button"));
-        const btn = btns.find(b => b.textContent.includes("Find Code") || b.textContent.includes("FIND CODE"));
-        if (btn) btn.click();
-      });
-      await page.waitForTimeout(3000);
-    }
-    log("IATA typed and Find Code clicked");
-
-    // Type tracking number
-    const trackingNumber = invoice.trackingNumber || invoice.invoiceNumber || "";
-    const trackInput = await page.$("input[placeholder*='racking'], input[placeholder*='irway']");
-    if (trackInput) {
-      await trackInput.click({ clickCount: 3 });
-      await trackInput.type(trackingNumber, { delay: 100 });
-    }
+    // Type IATA code using ID
+    await page.click("#iata-code", { clickCount: 3 }).catch(() => {});
+    await page.keyboard.type("FX", { delay: 150 });
     await page.waitForTimeout(500);
 
-    // Select Tennessee state
+    // Click Find Code
     await page.evaluate(() => {
-      const selects = Array.from(document.querySelectorAll("select"));
-      for (const sel of selects) {
-        const opt = Array.from(sel.options).find(o => o.text.includes("Tennessee"));
-        if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
-      }
+      const btns = Array.from(document.querySelectorAll("button"));
+      const btn = btns.find(b => b.textContent.includes("Find Code") || b.textContent.includes("FIND CODE"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(3000);
+    log("IATA FX entered and Find Code clicked");
+
+    // Type tracking number using ID
+    const trackingNumber = invoice.trackingNumber || invoice.invoiceNumber || "";
+    await page.click("#trackingNumber", { clickCount: 3 }).catch(() => {});
+    await page.keyboard.type(trackingNumber, { delay: 150 });
+    await page.waitForTimeout(500);
+    log("Tracking number entered: " + trackingNumber);
+
+    // Select Tennessee state
+    await page.select("select[name='state']", "TN").catch(async () => {
+      await page.evaluate(() => {
+        const sel = document.querySelector("select[name='state']");
+        if (sel) {
+          const opt = Array.from(sel.options).find(o => o.text.includes("Tennessee"));
+          if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+        }
+      });
     });
     await page.waitForTimeout(2000);
 
     // Select Memphis port
-    await page.evaluate(() => {
-      const selects = Array.from(document.querySelectorAll("select"));
-      for (const sel of selects) {
-        const opt = Array.from(sel.options).find(o => o.text.includes("Memphis"));
-        if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
-      }
+    await page.select("select[name='portOfArrival']", "MEM").catch(async () => {
+      await page.evaluate(() => {
+        const sel = document.querySelector("select[name='portOfArrival']");
+        if (sel) {
+          const opt = Array.from(sel.options).find(o => o.text.includes("Memphis"));
+          if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+        }
+      });
     });
     await page.waitForTimeout(500);
 
-    // Set arrival date using input
+    // Type arrival date using ID
     const arrivalDate = new Date();
     arrivalDate.setDate(arrivalDate.getDate() + 2);
     const mm = String(arrivalDate.getMonth() + 1).padStart(2, "0");
     const dd = String(arrivalDate.getDate()).padStart(2, "0");
     const yyyy = arrivalDate.getFullYear();
     const dateStr = mm + "/" + dd + "/" + yyyy;
-    const dateInput = await page.$("input[type='date'], input[placeholder*='ate']");
-    if (dateInput) {
-      await dateInput.click({ clickCount: 3 });
-      await dateInput.type(dateStr, { delay: 100 });
-      await page.keyboard.press("Tab");
-    }
+    await page.click("#portOfArrivalDate", { clickCount: 3 }).catch(() => {});
+    await page.keyboard.type(dateStr, { delay: 150 });
+    await page.keyboard.press("Tab");
     await page.waitForTimeout(500);
-    await page.waitForTimeout(2000);
-    const carrierInputs = await page.evaluate(() => {
-      const inputs = Array.from(document.querySelectorAll("input"));
-      return inputs.map(i => i.type + "|" + i.placeholder + "|" + i.id + "|" + i.className.substring(0, 30));
-    });
-    log("Carrier page inputs: " + JSON.stringify(carrierInputs));
+    log("Date entered: " + dateStr);
+
+    // Set hour to 08
+    await page.select("select[name='hour']", "08").catch(() => {});
+    await page.waitForTimeout(300);
+    log("Carrier details filled");
+
 
     const carrierSelects = await page.evaluate(() => {
       const selects = Array.from(document.querySelectorAll("select"));
