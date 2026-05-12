@@ -503,15 +503,26 @@ app.post("/submit-pnc", async (req, res) => {
     const afterReview = await page.evaluate(() => document.body.innerText);
     log("After Review: " + afterReview.substring(0, 200));
 
-        // Click "ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION"
+            // Click "ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION"
     log("Adding article to submission...");
-    await page.evaluate(() => {
+    await page.waitForTimeout(2000);
+    const addClicked = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION") ||
-                                  b.textContent.includes("Add this article to my Prior Notice"));
-      if (btn) btn.click();
+      const btn = btns.find(b => 
+        b.textContent.includes("ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION") ||
+        b.textContent.includes("Add this article to my Prior Notice") ||
+        b.textContent.includes("ADD THIS ARTICLE")
+      );
+      if (btn) { 
+        btn.scrollIntoView();
+        btn.click(); 
+        return "Clicked: " + btn.textContent.trim().substring(0, 50); 
+      }
+      return "Not found, buttons: " + btns.map(b => b.textContent.trim().substring(0, 30)).filter(t => t).join(", ");
     });
+    log("Add article result: " + addClicked);
     await page.waitForTimeout(5000);
+
 
     // Handle "Add Article Confirmation" popup - click "No, Done creating Food Articles"
     log("Handling Add Article Confirmation popup...");
