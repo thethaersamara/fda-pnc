@@ -268,14 +268,16 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(3000);
 
-    log("Filling Carrier details...");
+       log("Filling Carrier details...");
+    // Click Air button
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
       const btn = btns.find(b => b.textContent.trim() === "Air");
       if (btn) btn.click();
     });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
+    // Select Express Courier - Air from dropdown
     await page.evaluate(() => {
       const selects = Array.from(document.querySelectorAll("select"));
       for (const sel of selects) {
@@ -283,40 +285,34 @@ app.post("/submit-pnc", async (req, res) => {
         if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
       }
     });
-    await page.waitForTimeout(500);
-
-            // Type IATA code FX using keyboard
-    const iataFocused = await page.evaluate(() => {
-      const inputs = Array.from(document.querySelectorAll("input"));
-      const iata = inputs.find(i => i.placeholder && i.placeholder.includes("IATA"));
-      if (iata) { iata.focus(); iata.click(); return "focused"; }
-      return "not found";
-    });
-    if (iataFocused === "focused") {
-      await page.keyboard.press("Control+A");
-      await page.keyboard.press("Backspace");
-      await page.keyboard.type("FX", { delay: 100 });
-    }
     await page.waitForTimeout(1000);
 
+    // Type IATA code FX
+    const iataInput = await page.$("input[placeholder*='IATA'], input[placeholder*='iata']");
+    if (iataInput) {
+      await iataInput.click({ clickCount: 3 });
+      await iataInput.type("FX", { delay: 100 });
+      await page.waitForTimeout(500);
+      // Click Find Code button
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll("button"));
+        const btn = btns.find(b => b.textContent.includes("Find Code") || b.textContent.includes("FIND CODE"));
+        if (btn) btn.click();
+      });
+      await page.waitForTimeout(3000);
+    }
+    log("IATA typed and Find Code clicked");
 
-
-        // Type tracking number using keyboard
+    // Type tracking number
     const trackingNumber = invoice.trackingNumber || invoice.invoiceNumber || "";
-    const trackFocused = await page.evaluate(() => {
-      const inputs = Array.from(document.querySelectorAll("input"));
-      const field = inputs.find(i => i.placeholder && (i.placeholder.toLowerCase().includes("tracking") || i.placeholder.toLowerCase().includes("airway")));
-      if (field) { field.focus(); field.click(); return "focused"; }
-      return "not found";
-    });
-    if (trackFocused === "focused") {
-      await page.keyboard.press("Control+A");
-      await page.keyboard.press("Backspace");
-      await page.keyboard.type(trackingNumber, { delay: 100 });
+    const trackInput = await page.$("input[placeholder*='racking'], input[placeholder*='irway']");
+    if (trackInput) {
+      await trackInput.click({ clickCount: 3 });
+      await trackInput.type(trackingNumber, { delay: 100 });
     }
     await page.waitForTimeout(500);
 
-
+    // Select Tennessee state
     await page.evaluate(() => {
       const selects = Array.from(document.querySelectorAll("select"));
       for (const sel of selects) {
@@ -324,8 +320,9 @@ app.post("/submit-pnc", async (req, res) => {
         if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
       }
     });
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2000);
 
+    // Select Memphis port
     await page.evaluate(() => {
       const selects = Array.from(document.querySelectorAll("select"));
       for (const sel of selects) {
@@ -335,25 +332,21 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(500);
 
+    // Set arrival date using input
     const arrivalDate = new Date();
     arrivalDate.setDate(arrivalDate.getDate() + 2);
     const mm = String(arrivalDate.getMonth() + 1).padStart(2, "0");
     const dd = String(arrivalDate.getDate()).padStart(2, "0");
     const yyyy = arrivalDate.getFullYear();
     const dateStr = mm + "/" + dd + "/" + yyyy;
-    await page.evaluate((ds) => {
-      const inputs = Array.from(document.querySelectorAll("input"));
-      const dateField = inputs.find(i => i.type === "date" || (i.placeholder && i.placeholder.toLowerCase().includes("date")));
-      if (dateField) { dateField.value = ds; dateField.dispatchEvent(new Event("change", { bubbles: true })); }
-    }, dateStr);
+    const dateInput = await page.$("input[type='date'], input[placeholder*='ate']");
+    if (dateInput) {
+      await dateInput.click({ clickCount: 3 });
+      await dateInput.type(dateStr, { delay: 100 });
+      await page.keyboard.press("Tab");
+    }
     await page.waitForTimeout(500);
 
-           await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
-      if (btn) btn.click();
-    });
-    await page.waitForTimeout(3000);
 
     // Handle "required fields" popup - click "No, I want to continue to the Submitter Details"
     await page.evaluate(() => {
