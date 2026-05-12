@@ -540,14 +540,31 @@ app.post("/submit-pnc", async (req, res) => {
 
 
 
-    // Click "SUBMIT TO FDA"
+        // Click "SUBMIT TO FDA"
     log("Submitting to FDA...");
-    await page.evaluate(() => {
+    await page.waitForTimeout(3000);
+    const submitClicked = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("SUBMIT TO FDA") || b.textContent.includes("Submit to FDA"));
-      if (btn) btn.click();
+      const btn = btns.find(b => b.textContent.toLowerCase().includes("submit to fda"));
+      if (btn) { 
+        btn.scrollIntoView(); 
+        btn.click(); 
+        return "Clicked: " + btn.textContent.trim(); 
+      }
+      return "Not found, buttons: " + btns.map(b => b.textContent.trim().substring(0, 25)).filter(t => t).join(", ");
     });
-    await page.waitForTimeout(8000);
+    log("Submit to FDA result: " + submitClicked);
+    await page.waitForTimeout(10000);
+
+    const finalPage = await page.evaluate(() => document.body.innerText);
+    log("Final page: " + finalPage.substring(0, 300));
+
+    const confirmMatch = finalPage.match(/\d{12}/);
+    const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
+    log("Confirmation: " + confirmationNumber);
+
+    res.json({ success: true, logs, confirmationNumber, status: "submitted" });
+
 
     const finalPage = await page.evaluate(() => document.body.innerText);
     log("Final page: " + finalPage.substring(0, 300));
