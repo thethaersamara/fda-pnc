@@ -604,23 +604,36 @@ app.post("/submit-pnc", async (req, res) => {
     log("Submit to FDA result: " + submitClicked);
     await page.waitForTimeout(3000);
 
-        // Handle confirmation popup after Submit to FDA
-    const submitPopup = await page.evaluate(() => {
+        // Wait for submission to complete
+    await page.waitForFunction(() =>
+      document.body.innerText.includes("Submitted to FDA"),
+      { timeout: 15000 }
+    ).catch(() => {});
+    log("Waited for Submitted to FDA status");
+    await page.waitForTimeout(2000);
+
+    // Click Generate PDF
+    log("Generating PDF...");
+    await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const confirmBtn = btns.find(b => b.textContent.includes("No, I want to continue"));
-      if (confirmBtn) { confirmBtn.click(); return "Clicked: " + confirmBtn.textContent.trim(); }
-      return "No popup";
+      const btn = btns.find(b => b.textContent.includes("GENERATE PDF") || b.textContent.includes("Generate PDF"));
+      if (btn) btn.click();
     });
-    log("Submit popup: " + submitPopup);
+    await page.waitForTimeout(5000);
+    log("PDF generated");
+
+
 
     await page.waitForTimeout(8000);
 
-    const finalPage = await page.evaluate(() => document.body.innerText);
+        const finalPage = await page.evaluate(() => document.body.innerText);
     log("Final page: " + finalPage.substring(0, 300));
 
+    // Extract 12-digit PN confirmation number
     const confirmMatch = finalPage.match(/\d{12}/);
     const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
     log("Confirmation: " + confirmationNumber);
+
 
     res.json({ success: true, logs, confirmationNumber, status: "submitted" });
 
