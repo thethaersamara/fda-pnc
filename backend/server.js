@@ -508,11 +508,10 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(2000);
     const addClicked = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => 
-        b.textContent.includes("ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION") ||
-        b.textContent.includes("Add this article to my Prior Notice") ||
-        b.textContent.includes("ADD THIS ARTICLE")
+          const btn = btns.find(b => 
+        b.textContent.toLowerCase().includes("add this article to my prior")
       );
+
       if (btn) { 
         btn.scrollIntoView();
         btn.click(); 
