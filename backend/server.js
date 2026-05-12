@@ -478,16 +478,30 @@ app.post("/submit-pnc", async (req, res) => {
 
 
 
-    // Click "Review" in sidebar
+        // Click "Review" in sidebar
     log("Clicking Review...");
-    await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll("a, button"));
-      const link = links.find(l => l.textContent.trim() === "Review");
-      if (link) link.click();
+    await page.waitForTimeout(3000);
+    const reviewClicked = await page.evaluate(() => {
+      // Try clicking the Review link in the left sidebar navigation
+      const all = Array.from(document.querySelectorAll("*"));
+      const reviewEl = all.find(el => 
+        el.children.length === 0 && 
+        el.textContent.trim() === "Review" &&
+        el.tagName !== "SCRIPT" &&
+        el.tagName !== "STYLE"
+      );
+      if (reviewEl) {
+        reviewEl.click();
+        const parent = reviewEl.closest("a, button, li");
+        if (parent) parent.click();
+        return "Clicked Review element: " + reviewEl.tagName + " parent: " + (parent?.tagName || "none");
+      }
+      return "Review element not found";
     });
+    log("Review result: " + reviewClicked);
     await page.waitForTimeout(5000);
     const afterReview = await page.evaluate(() => document.body.innerText);
-    log("After Review click: " + afterReview.substring(0, 100));
+    log("After Review: " + afterReview.substring(0, 200));
 
         // Click "ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION"
     log("Adding article to submission...");
