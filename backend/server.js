@@ -553,7 +553,7 @@ app.post("/submit-pnc", async (req, res) => {
     const afterDone = await page.evaluate(() => document.body.innerText);
     log("After Done: " + afterDone.substring(0, 150));
 
-         await page.waitForTimeout(5000);
+        await page.waitForTimeout(5000);
 
     // Wait for food article status to change to "Added to Prior Notice"
     log("Waiting for food article to be Added to Prior Notice...");
@@ -561,7 +561,7 @@ app.post("/submit-pnc", async (req, res) => {
       document.body.innerText.includes("Added to Prior Notice"),
       { timeout: 15000 }
     ).catch(() => {});
-    
+
     const beforeSubmit = await page.evaluate(() => document.body.innerText);
     log("Before submit status: " + beforeSubmit.substring(0, 300));
 
@@ -591,7 +591,21 @@ app.post("/submit-pnc", async (req, res) => {
     log("Submit popup: " + submitPopup);
     await page.waitForTimeout(8000);
 
+    const finalPage = await page.evaluate(() => document.body.innerText);
+    log("Final page: " + finalPage.substring(0, 300));
+
+    const confirmMatch = finalPage.match(/\d{12}/);
+    const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
+    log("Confirmation: " + confirmationNumber);
+
+    res.json({ success: true, logs, confirmationNumber, status: "submitted" });
+
+  } catch (err) {
+    log("ERROR: " + err.message);
+    res.status(500).json({ success: false, error: err.message, logs });
+  }
 });
+
 app.post("/submit-all-pnc", async (req, res) => {
   const { sessionId, invoices } = req.body;
   if (!sessionId || !invoices || !invoices.length)
