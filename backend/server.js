@@ -294,14 +294,10 @@ app.post("/submit-pnc", async (req, res) => {
     await page.keyboard.type("FX", { delay: 150 });
     await page.waitForTimeout(500);
 
-    // Click Find Code
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button"));
-      const btn = btns.find(b => b.textContent.includes("Find Code") || b.textContent.includes("FIND CODE"));
-      if (btn) btn.click();
-    });
-    await page.waitForTimeout(3000);
-    log("IATA FX entered and Find Code clicked");
+        // Press Tab to confirm IATA code (don't click Find Code - it opens a modal)
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(2000);
+    log("IATA FX entered and Tab pressed");
 
     // Type tracking number using ID
     const trackingNumber = invoice.trackingNumber || invoice.invoiceNumber || "";
