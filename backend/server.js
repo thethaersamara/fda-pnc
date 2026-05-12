@@ -285,20 +285,37 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(500);
 
-    await page.evaluate(() => {
+            // Type IATA code FX using keyboard
+    const iataFocused = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll("input"));
-      const iata = inputs.find(i => (i.placeholder && i.placeholder.includes("IATA")) || i.value === "FX");
-      if (iata) { iata.value = "FX"; iata.dispatchEvent(new Event("input", { bubbles: true })); }
+      const iata = inputs.find(i => i.placeholder && i.placeholder.includes("IATA"));
+      if (iata) { iata.focus(); iata.click(); return "focused"; }
+      return "not found";
     });
+    if (iataFocused === "focused") {
+      await page.keyboard.press("Control+A");
+      await page.keyboard.press("Backspace");
+      await page.keyboard.type("FX", { delay: 100 });
+    }
+    await page.waitForTimeout(1000);
+
+
+
+        // Type tracking number using keyboard
+    const trackingNumber = invoice.trackingNumber || invoice.invoiceNumber || "";
+    const trackFocused = await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll("input"));
+      const field = inputs.find(i => i.placeholder && (i.placeholder.toLowerCase().includes("tracking") || i.placeholder.toLowerCase().includes("airway")));
+      if (field) { field.focus(); field.click(); return "focused"; }
+      return "not found";
+    });
+    if (trackFocused === "focused") {
+      await page.keyboard.press("Control+A");
+      await page.keyboard.press("Backspace");
+      await page.keyboard.type(trackingNumber, { delay: 100 });
+    }
     await page.waitForTimeout(500);
 
-    const trackingNumber = invoice.trackingNumber || invoice.invoiceNumber || "";
-    await page.evaluate((tn) => {
-      const inputs = Array.from(document.querySelectorAll("input"));
-      const field = inputs.find(i => (i.placeholder && (i.placeholder.toLowerCase().includes("tracking") || i.placeholder.toLowerCase().includes("airway"))));
-      if (field) { field.value = tn; field.dispatchEvent(new Event("input", { bubbles: true })); }
-    }, trackingNumber);
-    await page.waitForTimeout(500);
 
     await page.evaluate(() => {
       const selects = Array.from(document.querySelectorAll("select"));
