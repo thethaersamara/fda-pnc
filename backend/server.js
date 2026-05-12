@@ -346,6 +346,18 @@ app.post("/submit-pnc", async (req, res) => {
       await page.keyboard.press("Tab");
     }
     await page.waitForTimeout(500);
+    await page.waitForTimeout(2000);
+    const carrierInputs = await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll("input"));
+      return inputs.map(i => i.type + "|" + i.placeholder + "|" + i.id + "|" + i.className.substring(0, 30));
+    });
+    log("Carrier page inputs: " + JSON.stringify(carrierInputs));
+
+    const carrierSelects = await page.evaluate(() => {
+      const selects = Array.from(document.querySelectorAll("select"));
+      return selects.map(s => s.id + "|" + s.name + "|" + Array.from(s.options).slice(0,3).map(o => o.text).join(","));
+    });
+    log("Carrier page selects: " + JSON.stringify(carrierSelects));
 
 
     // Handle "required fields" popup - click "No, I want to continue to the Submitter Details"
