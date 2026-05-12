@@ -523,16 +523,21 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(5000);
 
 
-    // Handle "Add Article Confirmation" popup - click "No, Done creating Food Articles"
+        // Handle "Add Article Confirmation" popup - click "No, Done creating Food Articles"
     log("Handling Add Article Confirmation popup...");
-    await page.evaluate(() => {
+    await page.waitForTimeout(2000);
+    const popupClicked = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("No, Done creating Food Articles"));
-      if (btn) btn.click();
+      const btn = btns.find(b => b.textContent.toLowerCase().includes("no, done creating"));
+      if (btn) { btn.click(); return "Clicked: " + btn.textContent.trim(); }
+      // Log all buttons to see what's available
+      return "Not found, buttons: " + btns.map(b => b.textContent.trim().substring(0, 30)).filter(t => t).join(", ");
     });
+    log("Popup result: " + popupClicked);
     await page.waitForTimeout(5000);
     const afterDone = await page.evaluate(() => document.body.innerText);
-    log("After Done: " + afterDone.substring(0, 100));
+    log("After Done: " + afterDone.substring(0, 150));
+
 
 
     // Click "SUBMIT TO FDA"
