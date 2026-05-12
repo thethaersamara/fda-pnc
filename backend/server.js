@@ -280,14 +280,12 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(2000);
 
     // Select Express Courier - Air
-    await page.select("select[name='modeOfTransportation']", "EC").catch(async () => {
-      await page.evaluate(() => {
-        const sel = document.querySelector("select[name='modeOfTransportation']");
-        if (sel) {
-          const opt = Array.from(sel.options).find(o => o.text.includes("Express Courier - Air"));
-          if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
-        }
-      });
+        await page.evaluate(() => {
+      const sel = document.querySelector("select[name='modeOfTransportation']");
+      if (sel) {
+        const opt = Array.from(sel.options).find(o => o.text.includes("Express Courier - Air"));
+        if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      }
     });
     await page.waitForTimeout(1000);
 
@@ -313,27 +311,25 @@ app.post("/submit-pnc", async (req, res) => {
     log("Tracking number entered: " + trackingNumber);
 
     // Select Tennessee state
-    await page.select("select[name='state']", "TN").catch(async () => {
-      await page.evaluate(() => {
-        const sel = document.querySelector("select[name='state']");
-        if (sel) {
-          const opt = Array.from(sel.options).find(o => o.text.includes("Tennessee"));
-          if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
-        }
-      });
+        await page.evaluate(() => {
+      const sel = document.querySelector("select[name='state']");
+      if (sel) {
+        const opt = Array.from(sel.options).find(o => o.text.includes("Tennessee"));
+        if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      }
     });
+
     await page.waitForTimeout(2000);
 
     // Select Memphis port
-    await page.select("select[name='portOfArrival']", "MEM").catch(async () => {
-      await page.evaluate(() => {
-        const sel = document.querySelector("select[name='portOfArrival']");
-        if (sel) {
-          const opt = Array.from(sel.options).find(o => o.text.includes("Memphis"));
-          if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
-        }
-      });
+        await page.evaluate(() => {
+      const sel = document.querySelector("select[name='portOfArrival']");
+      if (sel) {
+        const opt = Array.from(sel.options).find(o => o.text.includes("Memphis"));
+        if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      }
     });
+
     await page.waitForTimeout(500);
 
     // Type arrival date using ID
@@ -350,7 +346,11 @@ app.post("/submit-pnc", async (req, res) => {
     log("Date entered: " + dateStr);
 
     // Set hour to 08
-    await page.select("select[name='hour']", "08").catch(() => {});
+    await page.evaluate(() => {
+      const sel = document.querySelector("select[name='hour']");
+      if (sel) { sel.value = "08"; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+    });
+
     await page.waitForTimeout(300);
     log("Carrier details filled");
 
