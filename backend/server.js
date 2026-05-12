@@ -565,18 +565,6 @@ app.post("/submit-pnc", async (req, res) => {
 
     res.json({ success: true, logs, confirmationNumber, status: "submitted" });
 
-
-    const finalPage = await page.evaluate(() => document.body.innerText);
-    log("Final page: " + finalPage.substring(0, 300));
-
-    const confirmMatch = finalPage.match(/[A-Z0-9]{2}\d{9,}/);
-    const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
-    log("Confirmation: " + confirmationNumber);
-
-    res.json({ success: true, logs, confirmationNumber, status: "submitted" });
-
-
-
   } catch (err) {
     log("ERROR: " + err.message);
     res.status(500).json({ success: false, error: err.message, logs });
