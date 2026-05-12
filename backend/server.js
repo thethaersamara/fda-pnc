@@ -418,14 +418,24 @@ app.post("/submit-pnc", async (req, res) => {
     const afterCopy = await page.evaluate(() => document.body.innerText);
     log("After Copy from Previous: " + afterCopy.substring(0, 150));
 
-        // Select ONLY the first food article checkbox
+            // Select ONLY Grape Molasses food article
     log("Selecting food article checkbox...");
     await page.evaluate(() => {
-      const checkboxes = Array.from(document.querySelectorAll("input[type='checkbox']"));
+      const rows = Array.from(document.querySelectorAll("tr"));
       // Uncheck all first
-      checkboxes.forEach(c => { if (c.checked) c.click(); });
-      // Check only the first one
-      if (checkboxes.length > 1) checkboxes[1].click();
+      rows.forEach(row => {
+        const cb = row.querySelector("input[type='checkbox']");
+        if (cb && cb.checked) cb.click();
+      });
+      // Find and check only the Grape Molasses row
+      const targetRow = rows.find(row => row.textContent.includes("Grape Molasses"));
+      if (targetRow) {
+        const cb = targetRow.querySelector("input[type='checkbox']");
+        if (cb) { cb.click(); return; }
+      }
+      // Fallback: check first checkbox
+      const first = document.querySelector("tr input[type='checkbox']");
+      if (first) first.click();
     });
     await page.waitForTimeout(1000);
 
