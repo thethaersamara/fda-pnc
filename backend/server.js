@@ -529,16 +529,18 @@ app.post("/submit-pnc", async (req, res) => {
       }
       return "Not found, buttons: " + btns.map(b => b.textContent.trim().substring(0, 30)).filter(t => t).join(", ");
     });
-    log("Add article result: " + addClicked);
-    await page.waitForTimeout(8000);
+      log("Add article result: " + addClicked);
+    
+    // Wait for popup to appear
+    await page.waitForFunction(() => {
+      const btns = Array.from(document.querySelectorAll("button"));
+      return btns.some(b => b.textContent.includes("No, Done creating Food Articles"));
+    }, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
 
-    // Check what page we're on after clicking Add Article
-    const afterAdd = await page.evaluate(() => document.body.innerText);
-    log("After add click: " + afterAdd.substring(0, 200));
-
-    // Handle "Add Article Confirmation" popup - click "No, Done creating Food Articles"
+    // Handle "Add Article Confirmation" popup
     log("Handling Add Article Confirmation popup...");
-    await page.waitForTimeout(2000);
+
     const popupClicked = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
       const btn = btns.find(b => b.textContent.toLowerCase().includes("no, done creating"));
