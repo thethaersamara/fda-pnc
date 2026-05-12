@@ -306,27 +306,34 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(500);
     log("Tracking number entered: " + trackingNumber);
 
-    // Select Tennessee state
-        await page.evaluate(() => {
+        // Wait for state select to have options then select Tennessee
+    await page.waitForFunction(() => {
+      const sel = document.querySelector("select[name='state']");
+      return sel && sel.options.length > 2;
+    }, { timeout: 10000 }).catch(() => {});
+    await page.evaluate(() => {
       const sel = document.querySelector("select[name='state']");
       if (sel) {
         const opt = Array.from(sel.options).find(o => o.text.includes("Tennessee"));
         if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
       }
     });
+    await page.waitForTimeout(3000);
 
-    await page.waitForTimeout(2000);
-
-    // Select Memphis port
-        await page.evaluate(() => {
+    // Wait for port select to load Memphis then select it
+    await page.waitForFunction(() => {
+      const sel = document.querySelector("select[name='portOfArrival']");
+      return sel && Array.from(sel.options).some(o => o.text.includes("Memphis"));
+    }, { timeout: 10000 }).catch(() => {});
+    await page.evaluate(() => {
       const sel = document.querySelector("select[name='portOfArrival']");
       if (sel) {
         const opt = Array.from(sel.options).find(o => o.text.includes("Memphis"));
         if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
       }
     });
-
     await page.waitForTimeout(500);
+
 
     // Type arrival date using ID
     const arrivalDate = new Date();
@@ -597,18 +604,15 @@ app.post("/submit-pnc", async (req, res) => {
     log("Submit to FDA result: " + submitClicked);
     await page.waitForTimeout(3000);
 
-    // Handle confirmation popup
+        // Handle confirmation popup after Submit to FDA
     const submitPopup = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
-      const confirmBtn = btns.find(b => 
-        b.textContent.toLowerCase().includes("confirm") ||
-        b.textContent.toLowerCase().includes("yes") ||
-        b.textContent.toLowerCase().includes("ok")
-      );
+      const confirmBtn = btns.find(b => b.textContent.includes("No, I want to continue"));
       if (confirmBtn) { confirmBtn.click(); return "Clicked: " + confirmBtn.textContent.trim(); }
       return "No popup";
     });
     log("Submit popup: " + submitPopup);
+
     await page.waitForTimeout(8000);
 
     const finalPage = await page.evaluate(() => document.body.innerText);
