@@ -324,34 +324,55 @@ app.post("/submit-pnc", async (req, res) => {
     }
     await page.waitForTimeout(3000);
 
-    // Select Memphis
+        // Select Memphis - use keyboard after focusing
+    await page.waitForFunction(() => {
+      const sel = document.querySelector("select[name='portOfArrival']");
+      return sel && Array.from(sel.options).some(o => o.text.includes("Memphis"));
+    }, { timeout: 10000 }).catch(() => {});
     try {
       await page.locator("select[name='portOfArrival']").selectOption({ label: "Memphis, TN" });
       log("Memphis selected via locator");
     } catch(e) {
-      try {
-        await page.locator("select[name='portOfArrival']").selectOption({ label: "Memphis" });
-        log("Memphis selected via fallback");
-      } catch(e2) {
-        log("Memphis failed: " + e2.message);
-      }
+      await page.evaluate(() => {
+        const sel = document.querySelector("select[name='portOfArrival']");
+        if (sel) {
+          const opt = Array.from(sel.options).find(o => o.text.includes("Memphis"));
+          if (opt) {
+            sel.value = opt.value;
+            sel.dispatchEvent(new Event("input", { bubbles: true }));
+            sel.dispatchEvent(new Event("change", { bubbles: true }));
+            sel.dispatchEvent(new Event("blur", { bubbles: true }));
+          }
+        }
+      });
+      log("Memphis selected via evaluate");
     }
     await page.waitForTimeout(500);
 
-    // Click date field to open calendar
-    await page.click("#portOfArrivalDate").catch(() => {});
-    await page.waitForTimeout(2000);
+    // Type date directly into date field
+    const arrivalDate = new Date();
+    arrivalDate.setDate(arrivalDate.getDate() + 2);
+    const mm = String(arrivalDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(arrivalDate.getDate()).padStart(2, "0");
+    const yyyy = arrivalDate.getFullYear();
+    const dateStr = mm + "/" + dd + "/" + yyyy;
+    await page.click("#portOfArrivalDate", { clickCount: 3 }).catch(() => {});
+    await page.waitForTimeout(500);
+    await page.keyboard.press("Escape"); // Close calendar if open
+    await page.waitForTimeout(300);
+    await page.click("#portOfArrivalDate", { clickCount: 3 }).catch(() => {});
+    await page.keyboard.type(dateStr, { delay: 100 });
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(500);
+    log("Date entered: " + dateStr);
 
-    // Log what calendar cells exist
-    const calendarCells = await page.evaluate(() => {
-      const all = Array.from(document.querySelectorAll("*"));
-      const cells = all.filter(el => 
-        el.className && typeof el.className === "string" && 
-        el.className.includes("calendar")
-      );
-      return cells.map(c => c.tagName + "." + c.className.substring(0,40) + ":" + c.textContent.trim().substring(0,10)).join(", ");
-    });
-    log("Calendar cells: " + calendarCells.substring(0, 300));
+    // Set hour and minute
+    await page.locator("select[name='hour']").selectOption("08").catch(() => {});
+    await page.waitForTimeout(300);
+    await page.locator("select[name='minute']").selectOption("00").catch(() => {});
+    await page.waitForTimeout(300);
+    log("Carrier details filled");
+
 
     // Try clicking the day
     const arrivalDate = new Date();
