@@ -279,15 +279,20 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(2000);
 
-    // Select Express Courier - Air
-        await page.evaluate(() => {
+        // Select Express Courier - Air using Angular-friendly approach
+    await page.evaluate(() => {
       const sel = document.querySelector("select[name='modeOfTransportation']");
       if (sel) {
         const opt = Array.from(sel.options).find(o => o.text.includes("Express Courier - Air"));
-        if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+        if (opt) {
+          sel.value = opt.value;
+          sel.dispatchEvent(new Event("change", { bubbles: true }));
+          sel.dispatchEvent(new Event("input", { bubbles: true }));
+        }
       }
     });
     await page.waitForTimeout(1000);
+
 
     // Type IATA code using ID
     await page.click("#iata-code", { clickCount: 3 }).catch(() => {});
@@ -306,33 +311,36 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(500);
     log("Tracking number entered: " + trackingNumber);
 
-        // Wait for state select to have options then select Tennessee
-    await page.waitForFunction(() => {
+            // Click state select and choose Tennessee
+    await page.evaluate(async () => {
       const sel = document.querySelector("select[name='state']");
-      return sel && sel.options.length > 2;
-    }, { timeout: 10000 }).catch(() => {});
-    await page.evaluate(() => {
-      const sel = document.querySelector("select[name='state']");
-      if (sel) {
-        const opt = Array.from(sel.options).find(o => o.text.includes("Tennessee"));
-        if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      if (!sel) return;
+      sel.focus();
+      const opt = Array.from(sel.options).find(o => o.text.includes("Tennessee"));
+      if (opt) {
+        sel.value = opt.value;
+        ["input", "change", "blur"].forEach(e => 
+          sel.dispatchEvent(new Event(e, { bubbles: true }))
+        );
       }
     });
     await page.waitForTimeout(3000);
 
-    // Wait for port select to load Memphis then select it
-    await page.waitForFunction(() => {
+    // Click portOfArrival and choose Memphis
+    await page.evaluate(async () => {
       const sel = document.querySelector("select[name='portOfArrival']");
-      return sel && Array.from(sel.options).some(o => o.text.includes("Memphis"));
-    }, { timeout: 10000 }).catch(() => {});
-    await page.evaluate(() => {
-      const sel = document.querySelector("select[name='portOfArrival']");
-      if (sel) {
-        const opt = Array.from(sel.options).find(o => o.text.includes("Memphis"));
-        if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      if (!sel) return;
+      sel.focus();
+      const opt = Array.from(sel.options).find(o => o.text.includes("Memphis"));
+      if (opt) {
+        sel.value = opt.value;
+        ["input", "change", "blur"].forEach(e => 
+          sel.dispatchEvent(new Event(e, { bubbles: true }))
+        );
       }
     });
     await page.waitForTimeout(500);
+
 
 
     // Type arrival date using ID
