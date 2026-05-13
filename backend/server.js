@@ -373,32 +373,6 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(300);
     log("Carrier details filled");
 
-
-    // Try clicking the day
-    const arrivalDate = new Date();
-    arrivalDate.setDate(arrivalDate.getDate() + 2);
-    const targetDay = String(arrivalDate.getDate());
-    const dayClicked = await page.evaluate((day) => {
-      // Try multiple selectors
-      const selectors = [
-        ".mat-calendar-body-cell-content",
-        ".mat-mdc-calendar-body-cell-content", 
-        "[class*='calendar-body-cell']",
-        "td[class*='calendar']",
-        "button[class*='calendar']"
-      ];
-      for (const sel of selectors) {
-        const cells = Array.from(document.querySelectorAll(sel));
-        const cell = cells.find(c => c.textContent.trim() === day);
-        if (cell) { cell.click(); return "Clicked day " + day + " via " + sel; }
-      }
-      return "Day " + day + " not found";
-    }, targetDay);
-    log("Date click result: " + dayClicked);
-    await page.waitForTimeout(500);
-
-
-
     // Handle "required fields" popup - click "No, I want to continue to the Submitter Details"
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
