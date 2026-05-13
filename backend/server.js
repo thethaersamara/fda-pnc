@@ -268,7 +268,7 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(3000);
 
-           log("Filling Carrier details...");
+              log("Filling Carrier details...");
     await page.waitForTimeout(2000);
 
     // Click Air button
@@ -279,71 +279,79 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(2000);
 
-        // Select Express Courier - Air using Angular-friendly approach
+    // Select Express Courier - Air
     await page.evaluate(() => {
       const sel = document.querySelector("select[name='modeOfTransportation']");
       if (sel) {
         const opt = Array.from(sel.options).find(o => o.text.includes("Express Courier - Air"));
         if (opt) {
           sel.value = opt.value;
-          sel.dispatchEvent(new Event("change", { bubbles: true }));
-          sel.dispatchEvent(new Event("input", { bubbles: true }));
+          ["input", "change", "blur"].forEach(e =>
+            sel.dispatchEvent(new Event(e, { bubbles: true }))
+          );
         }
       }
     });
     await page.waitForTimeout(1000);
 
-
-    // Type IATA code using ID
+    // Type IATA code FX
     await page.click("#iata-code", { clickCount: 3 }).catch(() => {});
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Backspace");
     await page.keyboard.type("FX", { delay: 150 });
-    await page.waitForTimeout(500);
-
-        // Press Tab to confirm IATA code (don't click Find Code - it opens a modal)
     await page.keyboard.press("Tab");
     await page.waitForTimeout(2000);
-    log("IATA FX entered and Tab pressed");
+    log("IATA FX entered");
 
-    // Type tracking number using ID
+    // Type tracking number
     const trackingNumber = invoice.trackingNumber || invoice.invoiceNumber || "";
     await page.click("#trackingNumber", { clickCount: 3 }).catch(() => {});
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Backspace");
     await page.keyboard.type(trackingNumber, { delay: 150 });
+    await page.keyboard.press("Tab");
     await page.waitForTimeout(500);
     log("Tracking number entered: " + trackingNumber);
 
-            // Click state select and choose Tennessee
-    await page.evaluate(async () => {
+    // Select Tennessee
+    await page.waitForFunction(() => {
       const sel = document.querySelector("select[name='state']");
-      if (!sel) return;
-      sel.focus();
-      const opt = Array.from(sel.options).find(o => o.text.includes("Tennessee"));
-      if (opt) {
-        sel.value = opt.value;
-        ["input", "change", "blur"].forEach(e => 
-          sel.dispatchEvent(new Event(e, { bubbles: true }))
-        );
+      return sel && sel.options.length > 2;
+    }, { timeout: 10000 }).catch(() => {});
+    await page.evaluate(() => {
+      const sel = document.querySelector("select[name='state']");
+      if (sel) {
+        const opt = Array.from(sel.options).find(o => o.text.includes("Tennessee"));
+        if (opt) {
+          sel.value = opt.value;
+          ["input", "change", "blur"].forEach(e =>
+            sel.dispatchEvent(new Event(e, { bubbles: true }))
+          );
+        }
       }
     });
     await page.waitForTimeout(3000);
 
-    // Click portOfArrival and choose Memphis
-    await page.evaluate(async () => {
+    // Select Memphis
+    await page.waitForFunction(() => {
       const sel = document.querySelector("select[name='portOfArrival']");
-      if (!sel) return;
-      sel.focus();
-      const opt = Array.from(sel.options).find(o => o.text.includes("Memphis"));
-      if (opt) {
-        sel.value = opt.value;
-        ["input", "change", "blur"].forEach(e => 
-          sel.dispatchEvent(new Event(e, { bubbles: true }))
-        );
+      return sel && Array.from(sel.options).some(o => o.text.includes("Memphis"));
+    }, { timeout: 10000 }).catch(() => {});
+    await page.evaluate(() => {
+      const sel = document.querySelector("select[name='portOfArrival']");
+      if (sel) {
+        const opt = Array.from(sel.options).find(o => o.text.includes("Memphis"));
+        if (opt) {
+          sel.value = opt.value;
+          ["input", "change", "blur"].forEach(e =>
+            sel.dispatchEvent(new Event(e, { bubbles: true }))
+          );
+        }
       }
     });
     await page.waitForTimeout(500);
 
-
-
-    // Type arrival date using ID
+    // Type arrival date
     const arrivalDate = new Date();
     arrivalDate.setDate(arrivalDate.getDate() + 2);
     const mm = String(arrivalDate.getMonth() + 1).padStart(2, "0");
@@ -351,19 +359,26 @@ app.post("/submit-pnc", async (req, res) => {
     const yyyy = arrivalDate.getFullYear();
     const dateStr = mm + "/" + dd + "/" + yyyy;
     await page.click("#portOfArrivalDate", { clickCount: 3 }).catch(() => {});
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Backspace");
     await page.keyboard.type(dateStr, { delay: 150 });
     await page.keyboard.press("Tab");
     await page.waitForTimeout(500);
     log("Date entered: " + dateStr);
 
-    // Set hour to 08
+    // Set hour
     await page.evaluate(() => {
       const sel = document.querySelector("select[name='hour']");
-      if (sel) { sel.value = "08"; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+      if (sel) {
+        sel.value = "08";
+        ["input", "change", "blur"].forEach(e =>
+          sel.dispatchEvent(new Event(e, { bubbles: true }))
+        );
+      }
     });
-
     await page.waitForTimeout(300);
     log("Carrier details filled");
+
 
 
     const carrierSelects = await page.evaluate(() => {
