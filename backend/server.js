@@ -268,7 +268,7 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(3000);
 
-                  log("Filling Carrier details...");
+                      log("Filling Carrier details...");
     await page.waitForTimeout(2000);
 
     // Click Air button
@@ -279,9 +279,8 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(2000);
 
-        // Select Mode of Transportation using Playwright's selectOption
+    // Select Mode of Transportation
     await page.locator("select[name='modeOfTransportation']").selectOption({ label: "Express Courier - Air" }).catch(async () => {
-      // Fallback
       await page.evaluate(() => {
         const sel = document.querySelector("select[name='modeOfTransportation']");
         if (sel) {
@@ -297,8 +296,7 @@ app.post("/submit-pnc", async (req, res) => {
     });
     log("Mode selected: " + modeSelected);
 
-
-    // Type IATA code FX using ID
+    // Type IATA code FX
     await page.click("#iata-code", { clickCount: 3 }).catch(() => {});
     await page.keyboard.press("Control+A");
     await page.keyboard.press("Backspace");
@@ -317,7 +315,7 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(500);
     log("Tracking number entered: " + trackingNumber);
 
-    /    // Select Tennessee
+    // Select Tennessee
     await page.locator("select[name='state']").selectOption({ label: "Tennessee" }).catch(() => {});
     await page.waitForTimeout(3000);
 
@@ -327,56 +325,28 @@ app.post("/submit-pnc", async (req, res) => {
     });
     await page.waitForTimeout(500);
 
-
-    // Click date field and select date from calendar
+    // Click date field and select from calendar
     const arrivalDate = new Date();
     arrivalDate.setDate(arrivalDate.getDate() + 2);
     const targetDay = String(arrivalDate.getDate());
     await page.click("#portOfArrivalDate").catch(() => {});
     await page.waitForTimeout(1000);
-    // Click the correct day in calendar
     const dayClicked = await page.evaluate((day) => {
-      const cells = Array.from(document.querySelectorAll("td, mat-calendar-cell, .mat-calendar-body-cell"));
+      const cells = Array.from(document.querySelectorAll("td, mat-calendar-cell, .mat-calendar-body-cell, [class*='calendar-body-cell']"));
       const cell = cells.find(c => c.textContent.trim() === day);
       if (cell) { cell.click(); return "Clicked day " + day; }
-      return "Day not found";
+      return "Day not found, cells: " + cells.map(c => c.textContent.trim()).join(",").substring(0, 100);
     }, targetDay);
     log("Date click result: " + dayClicked);
     await page.waitForTimeout(500);
 
-    // Set hour using spinner - click up arrow to set to 08
-    await page.evaluate(() => {
-      const sel = document.querySelector("select[name='hour']");
-      if (sel) {
-        sel.focus();
-        sel.value = "08";
-        ["input", "change", "blur"].forEach(e =>
-          sel.dispatchEvent(new Event(e, { bubbles: true }))
-        );
-      }
-    });
+    // Set hour and minute
+    await page.locator("select[name='hour']").selectOption("08").catch(() => {});
     await page.waitForTimeout(300);
-
-    // Set minute to 00
-    await page.evaluate(() => {
-      const sel = document.querySelector("select[name='minute']");
-      if (sel) {
-        sel.focus();
-        sel.value = "00";
-        ["input", "change", "blur"].forEach(e =>
-          sel.dispatchEvent(new Event(e, { bubbles: true }))
-        );
-      }
-    });
+    await page.locator("select[name='minute']").selectOption("00").catch(() => {});
     await page.waitForTimeout(300);
     log("Carrier details filled");
 
-
-    const carrierSelects = await page.evaluate(() => {
-      const selects = Array.from(document.querySelectorAll("select"));
-      return selects.map(s => s.id + "|" + s.name + "|" + Array.from(s.options).slice(0,3).map(o => o.text).join(","));
-    });
-    log("Carrier page selects: " + JSON.stringify(carrierSelects));
 
 
     // Handle "required fields" popup - click "No, I want to continue to the Submitter Details"
