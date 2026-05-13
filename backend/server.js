@@ -315,37 +315,66 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(500);
     log("Tracking number entered: " + trackingNumber);
 
-    // Select Tennessee
-    await page.locator("select[name='state']").selectOption({ label: "Tennessee" }).catch(() => {});
+       // Select Tennessee - try locator first then keyboard
+    try {
+      await page.locator("select[name='state']").selectOption({ label: "Tennessee" });
+      log("Tennessee selected via locator");
+    } catch(e) {
+      log("Tennessee locator failed: " + e.message);
+    }
     await page.waitForTimeout(3000);
 
     // Select Memphis
-    await page.locator("select[name='portOfArrival']").selectOption({ label: "Memphis, TN" }).catch(async () => {
-      await page.locator("select[name='portOfArrival']").selectOption({ label: "Memphis" }).catch(() => {});
-    });
+    try {
+      await page.locator("select[name='portOfArrival']").selectOption({ label: "Memphis, TN" });
+      log("Memphis selected via locator");
+    } catch(e) {
+      try {
+        await page.locator("select[name='portOfArrival']").selectOption({ label: "Memphis" });
+        log("Memphis selected via fallback");
+      } catch(e2) {
+        log("Memphis failed: " + e2.message);
+      }
+    }
     await page.waitForTimeout(500);
 
-    // Click date field and select from calendar
+    // Click date field to open calendar
+    await page.click("#portOfArrivalDate").catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Log what calendar cells exist
+    const calendarCells = await page.evaluate(() => {
+      const all = Array.from(document.querySelectorAll("*"));
+      const cells = all.filter(el => 
+        el.className && typeof el.className === "string" && 
+        el.className.includes("calendar")
+      );
+      return cells.map(c => c.tagName + "." + c.className.substring(0,40) + ":" + c.textContent.trim().substring(0,10)).join(", ");
+    });
+    log("Calendar cells: " + calendarCells.substring(0, 300));
+
+    // Try clicking the day
     const arrivalDate = new Date();
     arrivalDate.setDate(arrivalDate.getDate() + 2);
     const targetDay = String(arrivalDate.getDate());
-    await page.click("#portOfArrivalDate").catch(() => {});
-    await page.waitForTimeout(1000);
     const dayClicked = await page.evaluate((day) => {
-      const cells = Array.from(document.querySelectorAll("td, mat-calendar-cell, .mat-calendar-body-cell, [class*='calendar-body-cell']"));
-      const cell = cells.find(c => c.textContent.trim() === day);
-      if (cell) { cell.click(); return "Clicked day " + day; }
-      return "Day not found, cells: " + cells.map(c => c.textContent.trim()).join(",").substring(0, 100);
+      // Try multiple selectors
+      const selectors = [
+        ".mat-calendar-body-cell-content",
+        ".mat-mdc-calendar-body-cell-content", 
+        "[class*='calendar-body-cell']",
+        "td[class*='calendar']",
+        "button[class*='calendar']"
+      ];
+      for (const sel of selectors) {
+        const cells = Array.from(document.querySelectorAll(sel));
+        const cell = cells.find(c => c.textContent.trim() === day);
+        if (cell) { cell.click(); return "Clicked day " + day + " via " + sel; }
+      }
+      return "Day " + day + " not found";
     }, targetDay);
     log("Date click result: " + dayClicked);
     await page.waitForTimeout(500);
-
-    // Set hour and minute
-    await page.locator("select[name='hour']").selectOption("08").catch(() => {});
-    await page.waitForTimeout(300);
-    await page.locator("select[name='minute']").selectOption("00").catch(() => {});
-    await page.waitForTimeout(300);
-    log("Carrier details filled");
 
 
 
