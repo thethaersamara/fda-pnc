@@ -3,7 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const { chromium } = require("playwright-core");
 
-const app = express();
+const app = express(); 
 const PORT = process.env.PORT || 3001;
 const BB_KEY = process.env.BROWSERBASE_API_KEY || "bb_live_ObfYaIPxJbYfxQ_e1IMbsmwuluE";
 const BB_PROJECT = process.env.BROWSERBASE_PROJECT_ID || "529bb6fc-5478-4648-b83c-e9eb4531a1fb";
@@ -511,6 +511,78 @@ app.post("/submit-pnc", async (req, res) => {
   } catch (err) {
     log("ERROR: " + err.message);
     res.status(500).json({ success: false, error: err.message, logs });
+  }
+});
+
+app.post("/parse-invoice", async (req, res) => {
+  const { pdfBase64 } = req.body;
+  if (!pdfBase64) return res.status(400).json({ error: "pdfBase64 required" });
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "document",
+              source: {
+                type: "base64",
+                media_type: "application/pdf",
+                data: pdfBase64
+              }
+            },
+            {
+              type: "text",
+              text: `Extract the following from this FedEx commercial invoice and return ONLY a JSON object with no extra text:
+{
+  "trackingNumber": "airway bill or tracking number, empty string if not found",
+  "shipDate": "ship date in MM/DD/YYYY format",
+  "shipper": {
+    "name": "shipper full name",
+    "address": "full address",
+    "country": "country"
+  },
+  "consignee": {
+    "name": "consignee full name", 
+    "address": "full address",
+    "country": "country"
+  },
+  "items": [
+    {
+      "description": "clean product name without FS/Personal use only prefix",
+      "quantity": number,
+      "unit": "PCS or KG etc",
+      "weightKg": number,
+      "countryOfOrigin": "2-letter country code",
+      "value": number
+    }
+  ],
+  "currency": "USD",
+  "totalValue": number
+}`
+            }
+          ]
+        }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content[0].text;
+    const clean = text.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(clean);
+    res.json({ success: true, invoice: parsed });
+
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
