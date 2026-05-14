@@ -127,32 +127,27 @@ function InvoiceCard({ invoice, idx, onUpdate, onSubmit, onRemove, submitting, l
 
       {expanded && (
         <>
-          <div style={{ marginBottom: 20 }}>
+                              <div style={{ marginBottom: 20 }}>
             <div style={S.sectionTitle}>Shipment Details</div>
-            <div style={S.grid3}>
-              <Field label="Invoice Number"  value={invoice.invoiceNumber}    onChange={(v) => update("invoiceNumber", v)} />
-              <Field label="Invoice Date"    value={invoice.invoiceDate}      onChange={(v) => update("invoiceDate", v)} />
-              <Field label="Tracking Number" value={invoice.trackingNumber}   onChange={(v) => update("trackingNumber", v)} />
-              <Field label="Port of Entry"   value={invoice.portOfEntry}      onChange={(v) => update("portOfEntry", v)} />
-              <Field label="Est. Arrival"    value={invoice.estimatedArrival} onChange={(v) => update("estimatedArrival", v)} type="date" />
-              <Field label="Origin Country"  value={invoice.originCountry}    onChange={(v) => update("originCountry", v)} />
+            <div style={{ maxWidth: 300 }}>
+              <Field label="Tracking Number" value={invoice.trackingNumber} onChange={(v) => update("trackingNumber", v)} />
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 20 }}>
-            {[{ title: "Shipper", prefix: "shipper" }, { title: "Consignee", prefix: "consignee" }].map(({ title, prefix }) => (
-              <div key={prefix}>
-                <div style={S.sectionTitle}>{title}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <Field label="Name"    value={invoice[prefix]?.name}    onChange={(v) => update(`${prefix}.name`, v)} />
-                  <Field label="Address" value={invoice[prefix]?.address} onChange={(v) => update(`${prefix}.address`, v)} />
-                  <div style={S.grid3}>
-                    <Field label="City"    value={invoice[prefix]?.city}    onChange={(v) => update(`${prefix}.city`, v)} />
-                    <Field label="ZIP"     value={invoice[prefix]?.zip}     onChange={(v) => update(`${prefix}.zip`, v)} />
-                    <Field label="Country" value={invoice[prefix]?.country} onChange={(v) => update(`${prefix}.country`, v)} />
-                  </div>
-                </div>
+
+
+                   <div style={{ marginBottom: 20 }}>
+            <div style={S.sectionTitle}>Shipper</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <Field label="Name"    value={invoice.shipper?.name}    onChange={(v) => update("shipper.name", v)} />
+              <Field label="Address" value={invoice.shipper?.address} onChange={(v) => update("shipper.address", v)} />
+              <div style={S.grid3}>
+                <Field label="City"    value={invoice.shipper?.city}    onChange={(v) => update("shipper.city", v)} />
+                <Field label="ZIP"     value={invoice.shipper?.zip}     onChange={(v) => update("shipper.zip", v)} />
+                <Field label="Country" value={invoice.shipper?.country} onChange={(v) => update("shipper.country", v)} />
               </div>
+            </div>
+          </div>
             ))}
           </div>
 
@@ -438,9 +433,9 @@ const [invoices, setInvoices] = useState([{
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "#6b5e4e", marginBottom: 6 }}>
               {parsing ? "Parsing invoice with AI…" : "Drop PDFs or images here, or click to browse"}
             </div>
-            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e" }}>
-              Claude will extract all fields automatically. Review and edit before submitting.
-            </div>
+                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e" }}>
+            {invoice.shipper?.name}{invoice.trackingNumber ? ` · AWB: ${invoice.trackingNumber}` : ""}
+          </div>
           </div>
           {parseError && <div style={{ marginTop: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#991b1b" }}>⚠ {parseError}</div>}
         </div>
