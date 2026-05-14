@@ -575,11 +575,18 @@ app.post("/parse-invoice", async (req, res) => {
       })
     });
 
-    const data = await response.json();
+       const data = await response.json();
+    console.log("Claude response:", JSON.stringify(data).substring(0, 500));
+    
+    if (!data.content || !data.content[0]) {
+      return res.status(500).json({ success: false, error: "Claude returned no content: " + JSON.stringify(data) });
+    }
+    
     const text = data.content[0].text;
     const clean = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
     res.json({ success: true, invoice: parsed });
+
 
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
