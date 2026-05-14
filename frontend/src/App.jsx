@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 
 const BACKEND = "/api";
-
 const SESSION_ID = Math.random().toString(36).slice(2);
 
 async function parseInvoiceWithClaude(fileBase64, mimeType) {
@@ -80,7 +79,7 @@ function InvoiceCard({ invoice, idx, onUpdate, onSubmit, onRemove, submitting, l
 
   const update = (path, val) => {
     const clone = JSON.parse(JSON.stringify(invoice));
-    const keys  = path.split(".");
+    const keys = path.split(".");
     let obj = clone;
     for (let i = 0; i < keys.length - 1; i++) obj = obj[keys[i]];
     obj[keys[keys.length - 1]] = val;
@@ -101,12 +100,12 @@ function InvoiceCard({ invoice, idx, onUpdate, onSubmit, onRemove, submitting, l
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: expanded ? 24 : 0 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            <span style={{ fontSize: 18 }}>Invoice #{invoice.invoiceNumber || idx + 1}</span>
+            <span style={{ fontSize: 18 }}>Invoice #{idx + 1}</span>
             {invoice.needsPNC && <span style={S.tag("gold")}>⚑ PNC Required</span>}
             {status !== "idle" && <span style={S.tag(statusColor)}>{statusLabel}</span>}
           </div>
           <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e" }}>
-            {invoice.shipper?.name} → {invoice.consignee?.name}{invoice.invoiceDate ? ` · ${invoice.invoiceDate}` : ""}
+            {invoice.shipper?.name}{invoice.trackingNumber ? ` · AWB: ${invoice.trackingNumber}` : ""}
           </div>
           {invoice.confirmationNumber && (
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#166534", marginTop: 4 }}>
@@ -127,16 +126,14 @@ function InvoiceCard({ invoice, idx, onUpdate, onSubmit, onRemove, submitting, l
 
       {expanded && (
         <>
-                              <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 20 }}>
             <div style={S.sectionTitle}>Shipment Details</div>
             <div style={{ maxWidth: 300 }}>
               <Field label="Tracking Number" value={invoice.trackingNumber} onChange={(v) => update("trackingNumber", v)} />
             </div>
           </div>
 
-
-
-                   <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 20 }}>
             <div style={S.sectionTitle}>Shipper</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <Field label="Name"    value={invoice.shipper?.name}    onChange={(v) => update("shipper.name", v)} />
@@ -148,8 +145,6 @@ function InvoiceCard({ invoice, idx, onUpdate, onSubmit, onRemove, submitting, l
               </div>
             </div>
           </div>
-            ))}
-          </div>
 
           <div>
             <div style={S.sectionTitle}>Line Items</div>
@@ -159,12 +154,9 @@ function InvoiceCard({ invoice, idx, onUpdate, onSubmit, onRemove, submitting, l
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   <Field label="Description" value={item.description} onChange={(v) => updateItem(iIdx, "description", v)} />
                   <div style={S.grid3}>
-                    <Field label="HS Code"          value={item.hsCode}          onChange={(v) => updateItem(iIdx, "hsCode", v)} />
                     <Field label="Quantity"          value={item.quantity}        onChange={(v) => updateItem(iIdx, "quantity", v)} type="number" />
                     <Field label="Unit"              value={item.quantityUnit}    onChange={(v) => updateItem(iIdx, "quantityUnit", v)} />
                     <Field label="Country of Origin" value={item.countryOfOrigin} onChange={(v) => updateItem(iIdx, "countryOfOrigin", v)} />
-                    <Field label="Unit Value"        value={item.unitValue}       onChange={(v) => updateItem(iIdx, "unitValue", v)} type="number" />
-                    <Field label="Total Value"       value={item.totalValue}      onChange={(v) => updateItem(iIdx, "totalValue", v)} type="number" />
                   </div>
                 </div>
               </div>
@@ -181,23 +173,7 @@ function InvoiceCard({ invoice, idx, onUpdate, onSubmit, onRemove, submitting, l
 }
 
 export default function App() {
-const [invoices, setInvoices] = useState([{
-  invoiceNumber: "200151",
-  invoiceDate: "2026-04-04",
-  trackingNumber: "8921891",
-  portOfEntry: "Memphis",
-  estimatedArrival: "",
-  originCountry: "Israel",
-  shipper: { name: "Abdallah Muhtadi", address: "Al Zaharia 12 5", city: "Jerusalem", zip: "9730000", country: "Israel" },
-  consignee: { name: "FORWARD2ME", address: "Schwedter Allee 23", city: "Schwedt", zip: "16303", country: "Germany" },
-  items: [{ description: "Extra Virgin Olive Oil", hsCode: "1509", quantity: 1, unitValue: 6, totalValue: 6, countryOfOrigin: "Israel", needsPNC: true }],
-  totalValue: 19,
-  currency: "USD",
-  needsPNC: true,
-  pncStatus: "idle",
-  logs: []
-}]);
-
+  const [invoices, setInvoices] = useState([]);
   const [dragging,    setDragging]    = useState(false);
   const [parsing,     setParsing]     = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
@@ -239,38 +215,25 @@ const [invoices, setInvoices] = useState([{
   }, [processFiles]);
 
   const startLogin = async () => {
-    if (!fdaUser || !fdaPass) {
-      setLoginError("Please enter username and password.");
-      return;
-    }
+    if (!fdaUser || !fdaPass) { setLoginError("Please enter username and password."); return; }
     setLoginStatus("logging_in");
     setLoginError("");
     try {
-            const res = await fetch(`${BACKEND}/start-login`, {
+      const res = await fetch(`${BACKEND}/start-login`, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: SESSION_ID, fdaUsername: fdaUser, fdaPassword: fdaPass }),
       });
-
-            if (!res.ok && res.status !== 520) {
+      if (!res.ok && res.status !== 520) {
         const text = await res.text();
         throw new Error(`Server error ${res.status}: ${text}`);
       }
       if (res.status === 520) {
-        setLoginStatus("awaiting_otp");
-        setShowCreds(false);
-        setShowOTP(true);
-        return;
+        setLoginStatus("awaiting_otp"); setShowCreds(false); setShowOTP(true); return;
       }
-
       const data = await res.json();
       if (data.success) {
-        setLoginStatus("awaiting_otp");
-        setShowCreds(false);
-        setShowOTP(true);
+        setLoginStatus("awaiting_otp"); setShowCreds(false); setShowOTP(true);
       } else {
         setLoginStatus("error");
         setLoginError(data.error || "Login failed — check your credentials.");
@@ -290,17 +253,10 @@ const [invoices, setInvoices] = useState([{
         body: JSON.stringify({ sessionId: SESSION_ID, otp }),
       });
       const data = await res.json();
-      if (data.success) {
-        setLoginStatus("logged_in");
-        setShowOTP(false);
-      } else {
-        setLoginError(data.error || "Invalid OTP");
-      }
-    } catch (e) {
-      setLoginError(e.message);
-    } finally {
-      setOtpLoading(false);
-    }
+      if (data.success) { setLoginStatus("logged_in"); setShowOTP(false); }
+      else setLoginError(data.error || "Invalid OTP");
+    } catch (e) { setLoginError(e.message); }
+    finally { setOtpLoading(false); }
   };
 
   const updateInvoice = (idx, data) => setInvoices((prev) => prev.map((inv, i) => i === idx ? data : inv));
@@ -325,32 +281,7 @@ const [invoices, setInvoices] = useState([{
     } finally { setSubmitting(false); }
   }, [loggedIn]);
 
-  const submitAll = useCallback(async () => {
-    if (!loggedIn) { setShowCreds(true); return; }
-    const toSubmit = invoices.filter((inv) => inv.needsPNC && inv.pncStatus !== "success");
-    setSubmitting(true);
-    toSubmit.forEach((inv) => patchInvoice(inv, { pncStatus: "submitting", logs: [] }));
-    try {
-      const res = await fetch(`${BACKEND}/submit-all-pnc`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: SESSION_ID, invoices: toSubmit }),
-      });
-      const data = await res.json();
-      for (const r of data.results || []) {
-        setInvoices((prev) => prev.map((inv) =>
-          inv.invoiceNumber === r.invoiceNumber
-            ? { ...inv, pncStatus: r.success ? "success" : "error", confirmationNumber: r.confirmationNumber, logs: r.logs }
-            : inv
-        ));
-      }
-    } catch (e) {
-      toSubmit.forEach((inv) => patchInvoice(inv, { pncStatus: "error", logs: [e.message] }));
-    } finally { setSubmitting(false); }
-  }, [invoices, loggedIn]);
-
   const pncPending = invoices.filter((inv) => inv.needsPNC && inv.pncStatus !== "success");
-  const pncDone    = invoices.filter((inv) => inv.pncStatus === "success");
 
   const loginLabel = {
     idle:         "Login to FDA PNC",
@@ -375,8 +306,8 @@ const [invoices, setInvoices] = useState([{
       <div style={S.header}>
         <div style={S.logo}><span style={S.logoAccent}>FDA </span>Prior Notice Automation</div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          {invoices.length > 0 && pncPending.length > 0 && (
-            <button onClick={submitAll} disabled={submitting || !loggedIn} style={S.accentBtn(submitting || !loggedIn)}>
+          {pncPending.length > 0 && (
+            <button onClick={() => pncPending.forEach(submitOne)} disabled={submitting || !loggedIn} style={S.accentBtn(submitting || !loggedIn)}>
               Submit All ({pncPending.length})
             </button>
           )}
@@ -433,9 +364,9 @@ const [invoices, setInvoices] = useState([{
             <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "#6b5e4e", marginBottom: 6 }}>
               {parsing ? "Parsing invoice with AI…" : "Drop PDFs or images here, or click to browse"}
             </div>
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e" }}>
-            {invoice.shipper?.name}{invoice.trackingNumber ? ` · AWB: ${invoice.trackingNumber}` : ""}
-          </div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e" }}>
+              Claude will extract all fields automatically. Review and edit before submitting.
+            </div>
           </div>
           {parseError && <div style={{ marginTop: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#991b1b" }}>⚠ {parseError}</div>}
         </div>
