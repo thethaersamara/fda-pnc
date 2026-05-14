@@ -5,77 +5,14 @@ const BACKEND = "/api";
 const SESSION_ID = Math.random().toString(36).slice(2);
 
 async function parseInvoiceWithClaude(fileBase64, mimeType) {
-  const isImage = mimeType.startsWith("image/");
-  const contentBlock = isImage
-    ? { type: "image", source: { type: "base64", media_type: mimeType, data: fileBase64 } }
-    : { type: "document", source: { type: "base64", media_type: "application/pdf", data: fileBase64 } };
-
-  const prompt = `You are a customs document parser. Extract all relevant fields from this commercial invoice and return ONLY a valid JSON object (no markdown, no explanation) with this exact structure:
-
-{
-  "invoiceNumber": "",
-  "invoiceDate": "",
-  "trackingNumber": "",
-  "portOfEntry": "",
-  "estimatedArrival": "",
-  "originCountry": "",
-  "shipper": {
-    "name": "",
-    "address": "",
-    "city": "",
-    "zip": "",
-    "country": ""
-  },
-  "consignee": {
-    "name": "",
-    "address": "",
-    "city": "",
-    "zip": "",
-    "country": ""
-  },
-  "items": [
-    {
-      "description": "",
-      "hsCode": "",
-      "quantity": 0,
-      "quantityUnit": "",
-      "unitValue": 0,
-      "totalValue": 0,
-      "countryOfOrigin": "",
-      "manufacturer": "",
-      "needsPNC": true
-    }
-  ],
-  "totalValue": 0,
-  "currency": "USD",
-  "needsPNC": true
-}
-
-Rules:
-- needsPNC = true if any item HS code starts with 02-24 (food/beverage chapters) AND destination is US
-- If a field is not found, use empty string or 0
-- Return ONLY the JSON, nothing else`;
-
-   const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch(`${BACKEND}/parse-invoice`, {
     method: "POST",
-    headers: { 
-      "Content-Type": "application/json",
-      "x-api-key": "your-anthropic-api-key-here",
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true"
-    },
-
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{ role: "user", content: [contentBlock, { type: "text", text: prompt }] }],
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pdfBase64: fileBase64, mimeType }),
   });
-
-  const data  = await response.json();
-  const raw   = data.content?.find((b) => b.type === "text")?.text || "{}";
-  const clean = raw.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean);
+  const data = await response.json();
+  if (!data.success) throw new Error(data.error || "Parse failed");
+  return data.invoice;
 }
 
 const S = {
