@@ -514,66 +514,29 @@ app.post("/submit-pnc", async (req, res) => {
   }
 });
 
-app.post("/parse-invoice", async (req, res) => {
-  const { pdfBase64 } = req.body;
-  if (!pdfBase64) return res.status(400).json({ error: "pdfBase64 required" });
-
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-                model: "claude-sonnet-4-5",
-        max_tokens: 2000,
-        messages: [{
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: {
-                type: "base64",
-                media_type: "application/pdf",
-                data: pdfBase64
-              }
-            },
-            {
-              type: "text",
               text: `Extract the following from this FedEx commercial invoice and return ONLY a JSON object with no extra text:
 {
-  "trackingNumber": "airway bill or tracking number, empty string if not found",
-  "shipDate": "ship date in MM/DD/YYYY format",
+  "trackingNumber": "air waybill or tracking number, empty string if not found",
   "shipper": {
     "name": "shipper full name",
-    "address": "full address",
-    "country": "country"
-  },
-  "consignee": {
-    "name": "consignee full name", 
-    "address": "full address",
-    "country": "country"
+    "address": "street address only",
+    "city": "city",
+    "zip": "postal code",
+    "country": "full country name"
   },
   "items": [
     {
-      "description": "clean product name without FS/Personal use only prefix",
+      "description": "clean product name, remove FS/Personal use only prefix, keep only the actual product name",
       "quantity": number,
-      "unit": "PCS or KG etc",
-      "weightKg": number,
+      "quantityUnit": "PCS or KG etc",
       "countryOfOrigin": "2-letter country code",
-      "value": number
+      "needsPNC": true
     }
   ],
   "currency": "USD",
-  "totalValue": number
+  "totalValue": number,
+  "needsPNC": true
 }`
-            }
-          ]
-        }]
-      })
-    });
 
        const data = await response.json();
     console.log("Claude response:", JSON.stringify(data).substring(0, 500));
