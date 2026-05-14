@@ -501,37 +501,57 @@ app.post("/submit-pnc", async (req, res) => {
     await page.waitForTimeout(8000);
     log("PDF generated");
 
-    const finalPage = await page.evaluate(() => document.body.innerText);
-    const confirmMatch = finalPage.match(/\d{12}/);
-    const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
-    log("Confirmation: " + confirmationNumber);
+app.post("/parse-invoice", async (req, res) => {
+  const { pdfBase64, mimeType } = req.body;
+  if (!pdfBase64) return res.status(400).json({ error: "pdfBase64 required" });
 
-    res.json({ success: true, logs, confirmationNumber, status: "submitted" });
+  try {
+    const isImage = mimeType && mimeType.startsWith("image/");
+    const contentBlock = isImage
+      ? { type: "image", source: { type: "base64", media_type: mimeType, data: pdfBase64 } }
+      : { type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfBase64 } };
 
-  } catch (err) {
-    log("ERROR: " + err.message);
-    res.status(500).json({ success: false, error: err.message, logs });
-  }
-});
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 2000,
+        messages: [{
+          role: "user",
+          content: [
+            contentBlock,
+            {
+              type: "text",
+              text: "Extract the following from this FedEx commercial invoice and return ONLY a JSON object with no extra text:\n{\n  \"trackingNumber\": \"air waybill or tracking number, empty string if not found\",\n  \"shipper\": {\n    \"name\": \"shipper full name\",\n    \"address\": \"street address only\",\n    \"city\": \"city\",\n    \"zip\": \"postal code\",\n    \"country\": \"full country name\"\n  },\n  \"items\": [\n    {\n      \"description\": \"clean product name, remove FS/Personal use only prefix, keep only the actual product name\",\n      \"quantity\": 0,\n      \"quantityUnit\": \"PCS or KG etc\",\n      \"countryOfOrigin\": \"2-letter country code\",\n      \"needsPNC\": true\n    }\n  ],\n  \"currency\": \"USD\",\n  \"totalValue\": 0,\n  \"needsPNC\": true\n}"
+            }
+          ]
+        }]
+      })
+    });
 
-                 text: "Extract the following from this FedEx commercial invoice and return ONLY a JSON object with no extra text:\n{\n  \"trackingNumber\": \"air waybill or tracking number, empty string if not found\",\n  \"shipper\": {\n    \"name\": \"shipper full name\",\n    \"address\": \"street address only\",\n    \"city\": \"city\",\n    \"zip\": \"postal code\",\n    \"country\": \"full country name\"\n  },\n  \"items\": [\n    {\n      \"description\": \"clean product name, remove FS/Personal use only prefix\",\n      \"quantity\": 0,\n      \"quantityUnit\": \"PCS or KG etc\",\n      \"countryOfOrigin\": \"2-letter country code\",\n      \"needsPNC\": true\n    }\n  ],\n  \"currency\": \"USD\",\n  \"totalValue\": 0,\n  \"needsPNC\": true\n}"
-
-       const data = await response.json();
+    const data = await response.json();
     console.log("Claude response:", JSON.stringify(data).substring(0, 500));
-    
+
     if (!data.content || !data.content[0]) {
       return res.status(500).json({ success: false, error: "Claude returned no content: " + JSON.stringify(data) });
     }
-    
+
     const text = data.content[0].text;
     const clean = text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
     res.json({ success: true, invoice: parsed });
 
-
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+app.listen(PORT, () => console.log("Server running on port " + PORT));
+  
 
 app.listen(PORT, () => console.log("Server running on port " + PORT));
