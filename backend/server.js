@@ -514,29 +514,7 @@ app.post("/submit-pnc", async (req, res) => {
   }
 });
 
-              text: `Extract the following from this FedEx commercial invoice and return ONLY a JSON object with no extra text:
-{
-  "trackingNumber": "air waybill or tracking number, empty string if not found",
-  "shipper": {
-    "name": "shipper full name",
-    "address": "street address only",
-    "city": "city",
-    "zip": "postal code",
-    "country": "full country name"
-  },
-  "items": [
-    {
-      "description": "clean product name, remove FS/Personal use only prefix, keep only the actual product name",
-      "quantity": number,
-      "quantityUnit": "PCS or KG etc",
-      "countryOfOrigin": "2-letter country code",
-      "needsPNC": true
-    }
-  ],
-  "currency": "USD",
-  "totalValue": number,
-  "needsPNC": true
-}`
+                 text: "Extract the following from this FedEx commercial invoice and return ONLY a JSON object with no extra text:\n{\n  \"trackingNumber\": \"air waybill or tracking number, empty string if not found\",\n  \"shipper\": {\n    \"name\": \"shipper full name\",\n    \"address\": \"street address only\",\n    \"city\": \"city\",\n    \"zip\": \"postal code\",\n    \"country\": \"full country name\"\n  },\n  \"items\": [\n    {\n      \"description\": \"clean product name, remove FS/Personal use only prefix\",\n      \"quantity\": 0,\n      \"quantityUnit\": \"PCS or KG etc\",\n      \"countryOfOrigin\": \"2-letter country code\",\n      \"needsPNC\": true\n    }\n  ],\n  \"currency\": \"USD\",\n  \"totalValue\": 0,\n  \"needsPNC\": true\n}"
 
        const data = await response.json();
     console.log("Claude response:", JSON.stringify(data).substring(0, 500));
