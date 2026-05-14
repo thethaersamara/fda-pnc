@@ -492,16 +492,22 @@ app.post("/submit-pnc", async (req, res) => {
     log("Waited for Submitted to FDA status");
     await page.waitForTimeout(2000);
 
-    log("Generating PDF...");
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("GENERATE PDF") || b.textContent.includes("Generate PDF"));
-      if (btn) btn.click();
-    });
-    await page.waitForTimeout(8000);
-    log("PDF generated");
+        log("PDF generated");
 
-app.post("/parse-invoice", async (req, res) => {
+    const finalPage = await page.evaluate(() => document.body.innerText);
+    const confirmMatch = finalPage.match(/\d{12}/);
+    const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
+    log("Confirmation: " + confirmationNumber);
+
+    res.json({ success: true, logs, confirmationNumber, status: "submitted" });
+
+  } catch (err) {
+    log("ERROR: " + err.message);
+    res.status(500).json({ success: false, error: err.message, logs });
+  }
+});
+
+app.post("/parse-invoice",async (req, res) => {
   const { pdfBase64, mimeType } = req.body;
   if (!pdfBase64) return res.status(400).json({ error: "pdfBase64 required" });
 
