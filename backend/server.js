@@ -661,13 +661,22 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(8000);
     log("Reached Prior Notice Overview");
 
-    // Click pencil on Mode of Transportation
+        // Click pencil on Mode of Transportation
     log("Updating tracking number...");
     await page.evaluate(() => {
+      // Find the edit pencil next to MODE OF TRANSPORTATION section
+      const sections = Array.from(document.querySelectorAll("*"));
+      const modeSection = sections.find(el => el.textContent.includes("MODE OF TRANSPORTATION"));
+      if (modeSection) {
+        const pencil = modeSection.querySelector("button");
+        if (pencil) { pencil.click(); return; }
+      }
+      // Fallback: click first pencil icon button
       const btns = Array.from(document.querySelectorAll("button"));
-      const pencils = btns.filter(b => b.querySelector("mat-icon, i"));
+      const pencils = btns.filter(b => b.innerHTML.includes("edit") || b.querySelector("mat-icon, i"));
       if (pencils.length > 0) pencils[0].click();
     });
+
     // Wait for carrier page to load
     await page.waitForFunction(() =>
       document.body.innerText.includes("IATA") || document.body.innerText.includes("Tracking"),
