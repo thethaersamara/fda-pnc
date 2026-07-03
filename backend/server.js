@@ -836,12 +836,6 @@ app.post("/duplicate-pnc", async (req, res) => {
     const overviewCheck = await page.evaluate(() => document.body.innerText);
     log("Overview check: " + overviewCheck.substring(0, 300));
 
-      const all = Array.from(document.querySelectorAll("*"));
-      const el = all.find(e => e.children.length === 0 && e.textContent.trim() === "Prior Notice Overview" && e.tagName !== "SCRIPT");
-      if (el) { el.click(); const parent = el.closest("a, button, li"); if (parent) parent.click(); }
-    });
-    await page.waitForTimeout(5000);
-
     log("Processing food articles...");
     let articlesDone = false;
     let articleCount = 0;
