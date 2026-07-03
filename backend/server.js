@@ -556,5 +556,445 @@ app.post("/parse-invoice",async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+app.post("/duplicate-pnc", async (req, res) => {
+  const { sessionId, sourcePncId, trackingNumber, importer } = req.body;
+  if (!sessionId || !sourcePncId || !trackingNumber || !importer)
+    return res.status(400).json({ error: "Missing required fields" });
+
+  const session = sessions[sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+  if (session.status !== "logged_in") return res.status(400).json({ error: "Not logged in" });
+
+  const { page } = session;
+  const logs = [];
+  const log = (msg) => { console.log("[DUP] " + msg); logs.push(msg); };
+
+  try {
+    log("Navigating to PNSI...");
+    await page.waitForTimeout(3000);
+
+    // Click Prior Notice System Interface link
+    await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll("a"));
+      const link = links.find(l =>
+        l.textContent.trim() === "Prior Notice System Interface" && !l.closest("footer")
+      );
+      if (link) link.click();
+    });
+    await page.waitForTimeout(8000);
+
+    // Handle PNSI popup
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const yes = btns.find(b => b.textContent.trim() === "Yes");
+      if (yes) yes.click();
+    }).catch(() => {});
+    await page.waitForTimeout(3000);
+
+    // Click Submissions tab
+    log("Clicking Submissions tab...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("a, button"));
+      const btn = btns.find(b => b.textContent.trim() === "Submissions");
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+
+    // Type entry number in search field
+    log("Searching for PNC: " + sourcePncId);
+    await page.evaluate((id) => {
+      const inputs = Array.from(document.querySelectorAll("input"));
+      const field = inputs.find(i =>
+        i.placeholder && i.placeholder.toLowerCase().includes("entry") ||
+        i.id && i.id.toLowerCase().includes("entry")
+      );
+      if (field) { field.focus(); field.click(); }
+    }, sourcePncId);
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(sourcePncId, { delay: 100 });
+    await page.waitForTimeout(500);
+
+    // Click Search
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button"));
+      const btn = btns.find(b => b.textContent.trim() === "SEARCH" || b.textContent.trim() === "Search");
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+    log("Search done");
+
+    // Click Copy icon (second icon in Actions column)
+    await page.evaluate(() => {
+      const rows = Array.from(document.querySelectorAll("tr"));
+      for (const row of rows) {
+        const btns = Array.from(row.querySelectorAll("button, a"));
+        if (btns.length >= 2) { btns[1].click(); return; }
+      }
+    });
+    await page.waitForTimeout(3000);
+
+    // Click CONFIRM on copy popup
+    log("Confirming copy...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button"));
+      const btn = btns.find(b => b.textContent.trim() === "CONFIRM" || b.textContent.trim() === "Confirm");
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+
+    // Select ALL articles - click top checkbox
+    log("Selecting all articles...");
+    await page.evaluate(() => {
+      const checkboxes = Array.from(document.querySelectorAll("input[type='checkbox']"));
+      if (checkboxes.length > 0) checkboxes[0].click();
+    });
+    await page.waitForTimeout(1000);
+
+    // Click COPY WITH SELECTED FOOD ARTICLES
+    log("Copying with selected food articles...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("COPY WITH SELECTED FOOD ARTICLES"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(8000);
+    log("Reached Prior Notice Overview");
+
+    // Click pencil on Mode of Transportation
+    log("Updating tracking number...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button"));
+      const pencils = btns.filter(b => b.querySelector("mat-icon, i"));
+      if (pencils.length > 0) pencils[0].click();
+    });
+    await page.waitForTimeout(5000);
+
+    // Update tracking number
+    await page.click("#trackingNumber", { clickCount: 3 }).catch(() => {});
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(trackingNumber, { delay: 100 });
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(500);
+
+    // Update arrival date
+    const arrivalDate = new Date();
+    arrivalDate.setDate(arrivalDate.getDate() + 2);
+    const mm = String(arrivalDate.getMonth() + 1).padStart(2, "0");
+    const dd = String(arrivalDate.getDate()).padStart(2, "0");
+    const yyyy = arrivalDate.getFullYear();
+    const dateStr = mm + "/" + dd + "/" + yyyy;
+    await page.click("#portOfArrivalDate", { clickCount: 3 }).catch(() => {});
+    await page.waitForTimeout(500);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+    await page.click("#portOfArrivalDate", { clickCount: 3 }).catch(() => {});
+    await page.keyboard.type(dateStr, { delay: 100 });
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(500);
+    log("Tracking and date updated");
+
+    // Save carrier page
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+
+    // Click pencil on Importer Details
+    log("Updating importer details...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button"));
+      const pencils = btns.filter(b => b.querySelector("mat-icon, i"));
+      // Importer pencil is usually the last one in the overview
+      if (pencils.length > 0) pencils[pencils.length - 1].click();
+    });
+    await page.waitForTimeout(5000);
+
+    // Click "I am not the Importer"
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("I am not the Importer"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(2000);
+
+    // Fill importer name
+    const importerNameField = await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll("input"));
+      const field = inputs.find(i => i.placeholder && i.placeholder.toLowerCase().includes("name") ||
+        i.id && i.id.toLowerCase().includes("name"));
+      if (field) { field.focus(); field.click(); return "found"; }
+      return "not found";
+    });
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(importer.name, { delay: 100 });
+    await page.waitForTimeout(300);
+
+    // Fill street address
+    await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll("input, textarea"));
+      const field = inputs.find(i =>
+        (i.placeholder && i.placeholder.toLowerCase().includes("address")) ||
+        (i.id && i.id.toLowerCase().includes("address"))
+      );
+      if (field) { field.focus(); field.click(); }
+    });
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(importer.address, { delay: 100 });
+    await page.waitForTimeout(300);
+
+    // Fill city
+    await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll("input"));
+      const field = inputs.find(i =>
+        (i.placeholder && i.placeholder.toLowerCase().includes("city")) ||
+        (i.id && i.id.toLowerCase().includes("city"))
+      );
+      if (field) { field.focus(); field.click(); }
+    });
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(importer.city, { delay: 100 });
+    await page.waitForTimeout(300);
+
+    // Select state
+    await page.locator("select[name='state'], select[id*='state']").selectOption({ label: importer.state }).catch(async () => {
+      await page.evaluate((state) => {
+        const sels = Array.from(document.querySelectorAll("select"));
+        for (const sel of sels) {
+          const opt = Array.from(sel.options).find(o => o.text.includes(state));
+          if (opt) {
+            sel.value = opt.value;
+            ["input", "change", "blur"].forEach(ev =>
+              sel.dispatchEvent(new Event(ev, { bubbles: true }))
+            );
+          }
+        }
+      }, importer.state);
+    });
+    await page.waitForTimeout(500);
+
+    // Fill zip
+    await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll("input"));
+      const field = inputs.find(i =>
+        (i.placeholder && i.placeholder.toLowerCase().includes("zip")) ||
+        (i.id && i.id.toLowerCase().includes("zip"))
+      );
+      if (field) { field.focus(); field.click(); }
+    });
+    await page.keyboard.press("Control+A");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(importer.zip, { delay: 100 });
+    await page.waitForTimeout(300);
+
+    // Save importer
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(5000);
+    log("Importer details saved");
+
+    // Now handle each food article
+    log("Processing food articles...");
+    let articlesDone = false;
+    let articleCount = 0;
+
+    while (!articlesDone) {
+      // Find next In Progress article pencil
+      const foundArticle = await page.evaluate(() => {
+        const rows = Array.from(document.querySelectorAll("tr"));
+        for (const row of rows) {
+          if (row.textContent.includes("In Progress")) {
+            const btns = Array.from(row.querySelectorAll("button, a"));
+            if (btns.length > 0) { btns[0].click(); return true; }
+          }
+        }
+        return false;
+      });
+
+      if (!foundArticle) { articlesDone = true; break; }
+      articleCount++;
+      log("Processing article " + articleCount + "...");
+      await page.waitForTimeout(5000);
+
+      // Click Ultimate Consignee in sidebar
+      await page.evaluate(() => {
+        const all = Array.from(document.querySelectorAll("*"));
+        const el = all.find(e =>
+          e.children.length === 0 &&
+          e.textContent.trim() === "Ultimate Consignee" &&
+          e.tagName !== "SCRIPT"
+        );
+        if (el) { el.click(); const parent = el.closest("a, button, li"); if (parent) parent.click(); }
+      });
+      await page.waitForTimeout(3000);
+
+      // Fill ultimate consignee - same importer info
+      // Name
+      await page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll("input"));
+        const field = inputs.find(i => i.id && i.id.toLowerCase().includes("name") ||
+          i.placeholder && i.placeholder.toLowerCase().includes("name"));
+        if (field) { field.focus(); field.click(); }
+      });
+      await page.keyboard.press("Control+A");
+      await page.keyboard.press("Backspace");
+      await page.keyboard.type(importer.name, { delay: 100 });
+      await page.waitForTimeout(300);
+
+      // Address
+      await page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll("input, textarea"));
+        const field = inputs.find(i => i.id && i.id.toLowerCase().includes("address") ||
+          i.placeholder && i.placeholder.toLowerCase().includes("address"));
+        if (field) { field.focus(); field.click(); }
+      });
+      await page.keyboard.press("Control+A");
+      await page.keyboard.press("Backspace");
+      await page.keyboard.type(importer.address, { delay: 100 });
+      await page.waitForTimeout(300);
+
+      // City
+      await page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll("input"));
+        const field = inputs.find(i => i.id && i.id.toLowerCase().includes("city") ||
+          i.placeholder && i.placeholder.toLowerCase().includes("city"));
+        if (field) { field.focus(); field.click(); }
+      });
+      await page.keyboard.press("Control+A");
+      await page.keyboard.press("Backspace");
+      await page.keyboard.type(importer.city, { delay: 100 });
+      await page.waitForTimeout(300);
+
+      // State
+      await page.locator("select[name='state'], select[id*='state']").selectOption({ label: importer.state }).catch(async () => {
+        await page.evaluate((state) => {
+          const sels = Array.from(document.querySelectorAll("select"));
+          for (const sel of sels) {
+            const opt = Array.from(sel.options).find(o => o.text.includes(state));
+            if (opt) {
+              sel.value = opt.value;
+              ["input", "change", "blur"].forEach(ev =>
+                sel.dispatchEvent(new Event(ev, { bubbles: true }))
+              );
+            }
+          }
+        }, importer.state);
+      });
+      await page.waitForTimeout(500);
+
+      // Zip
+      await page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll("input"));
+        const field = inputs.find(i => i.id && i.id.toLowerCase().includes("zip") ||
+          i.placeholder && i.placeholder.toLowerCase().includes("zip"));
+        if (field) { field.focus(); field.click(); }
+      });
+      await page.keyboard.press("Control+A");
+      await page.keyboard.press("Backspace");
+      await page.keyboard.type(importer.zip, { delay: 100 });
+      await page.waitForTimeout(300);
+
+      // Click Review in sidebar
+      await page.evaluate(() => {
+        const all = Array.from(document.querySelectorAll("*"));
+        const el = all.find(e =>
+          e.children.length === 0 &&
+          e.textContent.trim() === "Review" &&
+          e.tagName !== "SCRIPT"
+        );
+        if (el) { el.click(); const parent = el.closest("a, button, li"); if (parent) parent.click(); }
+      });
+      await page.waitForTimeout(5000);
+
+      // Click ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll("button, a"));
+        const btn = btns.find(b => b.textContent.toLowerCase().includes("add this article to my prior"));
+        if (btn) { btn.scrollIntoView(); btn.click(); }
+      });
+
+      // Wait for popup
+      await page.waitForFunction(() => {
+        const btns = Array.from(document.querySelectorAll("button"));
+        return btns.some(b =>
+          b.textContent.includes("No, Done creating Food Articles") ||
+          b.textContent.includes("Yes, Create new Food Article")
+        );
+      }, { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(1000);
+
+      // Check if more articles exist - if yes click Yes, else No
+      const pageText = await page.evaluate(() => document.body.innerText);
+      const hasMoreInProgress = await page.evaluate(() => {
+        const rows = Array.from(document.querySelectorAll("tr"));
+        return rows.some(r => r.textContent.includes("In Progress"));
+      });
+
+      if (hasMoreInProgress) {
+        await page.evaluate(() => {
+          const btns = Array.from(document.querySelectorAll("button"));
+          const btn = btns.find(b => b.textContent.includes("No, Done creating Food Articles"));
+          if (btn) btn.click();
+        });
+        await page.waitForTimeout(3000);
+      } else {
+        await page.evaluate(() => {
+          const btns = Array.from(document.querySelectorAll("button"));
+          const btn = btns.find(b => b.textContent.includes("No, Done creating Food Articles"));
+          if (btn) btn.click();
+        });
+        await page.waitForTimeout(3000);
+        articlesDone = true;
+      }
+    }
+
+    log("All " + articleCount + " articles processed");
+
+    // Submit to FDA
+    log("Submitting to FDA...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.toLowerCase().includes("submit to fda"));
+      if (btn) { btn.scrollIntoView(); btn.click(); }
+    });
+
+    await page.waitForFunction(() =>
+      document.body.innerText.includes("Submitted to FDA"),
+      { timeout: 60000 }
+    ).catch(() => {});
+    log("Submitted to FDA");
+    await page.waitForTimeout(2000);
+
+    // Generate PDF
+    log("Generating PDF...");
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const btn = btns.find(b => b.textContent.includes("GENERATE PDF") || b.textContent.includes("Generate PDF"));
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(8000);
+    log("PDF generated");
+
+    const finalPage = await page.evaluate(() => document.body.innerText);
+    const confirmMatch = finalPage.match(/\d{12}/);
+    const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
+    log("Confirmation: " + confirmationNumber);
+
+    res.json({ success: true, logs, confirmationNumber, status: "submitted" });
+
+  } catch (err) {
+    log("ERROR: " + err.message);
+    res.status(500).json({ success: false, error: err.message, logs });
+  }
+});
 
 app.listen(PORT, () => console.log("Server running on port " + PORT));
