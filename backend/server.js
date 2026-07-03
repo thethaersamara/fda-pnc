@@ -668,7 +668,12 @@ app.post("/duplicate-pnc", async (req, res) => {
       const pencils = btns.filter(b => b.querySelector("mat-icon, i"));
       if (pencils.length > 0) pencils[0].click();
     });
-    await page.waitForTimeout(5000);
+    // Wait for carrier page to load
+    await page.waitForFunction(() =>
+      document.body.innerText.includes("IATA") || document.body.innerText.includes("Tracking"),
+      { timeout: 15000 }
+    ).catch(() => {});
+    await page.waitForTimeout(2000);
 
     // Update tracking number
     await page.click("#trackingNumber", { clickCount: 3 }).catch(() => {});
@@ -695,13 +700,19 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(500);
     log("Tracking and date updated");
 
-    // Save carrier page
+        // Click Prior Notice Overview in left sidebar
     await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE"));
-      if (btn) btn.click();
+      const all = Array.from(document.querySelectorAll("*"));
+      const el = all.find(e =>
+        e.children.length === 0 &&
+        e.textContent.trim() === "Prior Notice Overview" &&
+        e.tagName !== "SCRIPT"
+      );
+      if (el) { el.click(); const parent = el.closest("a, button, li"); if (parent) parent.click(); }
     });
     await page.waitForTimeout(5000);
+    log("Back on overview after tracking update");
+
 
     // Click pencil on Importer Details
     log("Updating importer details...");
