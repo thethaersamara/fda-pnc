@@ -822,9 +822,20 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(5000);
     log("Importer details saved");
 
-    // Now handle each food article
-        // Make sure we're on the overview page
+    // Now handle each food article    log("Importer details saved");
+    await page.waitForTimeout(3000);
+
+    // Navigate back to overview
     await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll("a, button, li, span, div"));
+      const el = links.find(e => e.textContent.trim() === "Prior Notice Overview");
+      if (el) el.click();
+    });
+    await page.waitForTimeout(5000);
+
+    const overviewCheck = await page.evaluate(() => document.body.innerText);
+    log("Overview check: " + overviewCheck.substring(0, 300));
+
       const all = Array.from(document.querySelectorAll("*"));
       const el = all.find(e => e.children.length === 0 && e.textContent.trim() === "Prior Notice Overview" && e.tagName !== "SCRIPT");
       if (el) { el.click(); const parent = el.closest("a, button, li"); if (parent) parent.click(); }
