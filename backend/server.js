@@ -823,9 +823,18 @@ app.post("/duplicate-pnc", async (req, res) => {
     log("Importer details saved");
 
     // Now handle each food article
+        // Make sure we're on the overview page
+    await page.evaluate(() => {
+      const all = Array.from(document.querySelectorAll("*"));
+      const el = all.find(e => e.children.length === 0 && e.textContent.trim() === "Prior Notice Overview" && e.tagName !== "SCRIPT");
+      if (el) { el.click(); const parent = el.closest("a, button, li"); if (parent) parent.click(); }
+    });
+    await page.waitForTimeout(5000);
+
     log("Processing food articles...");
     let articlesDone = false;
     let articleCount = 0;
+
 
     while (!articlesDone) {
       // Find next In Progress article pencil
@@ -991,8 +1000,9 @@ app.post("/duplicate-pnc", async (req, res) => {
       document.body.innerText.includes("Submitted to FDA"),
       { timeout: 60000 }
     ).catch(() => {});
-    log("Submitted to FDA");
-    await page.waitForTimeout(2000);
+        log("Submitted to FDA");
+    await page.waitForTimeout(5000);
+
 
     // Generate PDF
     log("Generating PDF...");
