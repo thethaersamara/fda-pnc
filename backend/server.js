@@ -825,12 +825,17 @@ app.post("/duplicate-pnc", async (req, res) => {
     // Now handle each food article    log("Importer details saved");
     await page.waitForTimeout(3000);
 
-    // Navigate back to overview
+        // Navigate back to submission overview via back link
     await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll("a, button, li, span, div"));
-      const el = links.find(e => e.textContent.trim() === "Prior Notice Overview");
-      if (el) el.click();
+      const links = Array.from(document.querySelectorAll("a, button"));
+      const btn = links.find(b => 
+        b.textContent.includes("Back to: Edit Prior Notice") ||
+        b.textContent.includes("GO TO SUBMISSION OVERVIEW") ||
+        b.textContent.includes("Go to Submission Overview")
+      );
+      if (btn) btn.click();
     });
+
     await page.waitForTimeout(5000);
 
     const overviewCheck = await page.evaluate(() => document.body.innerText);
