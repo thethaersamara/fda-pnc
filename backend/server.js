@@ -712,19 +712,16 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(500);
     log("Tracking and date updated");
 
-        // Click Prior Notice Overview in left sidebar
-    await page.evaluate(() => {
-      const all = Array.from(document.querySelectorAll("*"));
-      const el = all.find(e =>
-        e.children.length === 0 &&
-        e.textContent.trim() === "Prior Notice Overview" &&
-        e.tagName !== "SCRIPT"
-      );
-      if (el) { el.click(); const parent = el.closest("a, button, li"); if (parent) parent.click(); }
+    // Click Prior Notice Overview to save and return
+    await page.locator("text=Prior Notice Overview").first().click().catch(async () => {
+      await page.evaluate(() => {
+        const all = Array.from(document.querySelectorAll("a, li, span"));
+        const el = all.find(e => e.textContent.trim() === "Prior Notice Overview");
+        if (el) el.click();
+      });
     });
     await page.waitForTimeout(5000);
     log("Back on overview after tracking update");
-
 
     // Click pencil on Importer Details
     log("Updating importer details...");
@@ -736,13 +733,6 @@ app.post("/duplicate-pnc", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-    // Click "I am not the Importer"
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("I am not the Importer"));
-      if (btn) btn.click();
-    });
-    await page.waitForTimeout(2000);
 
     // Fill importer name
     const importerNameField = await page.evaluate(() => {
