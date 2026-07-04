@@ -281,12 +281,12 @@ export default function App() {
     finally { setSubmitting(false); }
   }, [loggedIn]);
 
-  const submitDuplicate = async (row, idx) => {
+    const submitDuplicate = async (row, idx) => {
     if (!loggedIn) { setShowCreds(true); return; }
     setDupRows(prev => prev.map((r, i) => i === idx ? { ...r, status: "submitting", logs: [] } : r));
     setDupSubmitting(true);
     try {
-      const res = await fetch(`${BACKEND}/duplicate-pnc`, {
+      await fetch(`${BACKEND}/duplicate-pnc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -302,17 +302,31 @@ export default function App() {
           }
         }),
       });
-      const data = await res.json();
-      setDupRows(prev => prev.map((r, i) => i === idx ? {
-        ...r,
-        status: data.success ? "success" : "error",
-        confirmationNumber: data.confirmationNumber || "",
-        logs: data.logs || []
-      } : r));
+
+      // Poll for result every 10 seconds
+      const poll = setInterval(async () => {
+        try {
+          const res = await fetch(`${BACKEND}/duplicate-pnc-status/${SESSION_ID}`);
+          const data = await res.json();
+          if (data.status === "done") {
+            clearInterval(poll);
+            setDupRows(prev => prev.map((r, i) => i === idx ? {
+              ...r,
+              status: data.success ? "success" : "error",
+              confirmationNumber: data.confirmationNumber || "",
+              logs: data.logs || []
+            } : r));
+            setDupSubmitting(false);
+          }
+        } catch {}
+      }, 10000);
+
     } catch (e) {
       setDupRows(prev => prev.map((r, i) => i === idx ? { ...r, status: "error", logs: [e.message] } : r));
-    } finally { setDupSubmitting(false); }
+      setDupSubmitting(false);
+    }
   };
+
 
   const pncPending = invoices.filter((inv) => inv.needsPNC && inv.pncStatus !== "success");
 
