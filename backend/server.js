@@ -664,30 +664,48 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(8000);
     log("Reached Prior Notice Overview");
 
-    // Capture the new submission ID (the entry identifier link in the header)
-    const submissionId = await page.evaluate(() => {
-      const m = document.body.innerText.match(/###-\d+-\d+/);
-      return m ? m[0] : null;
-    });
-    log("New submission ID: " + submissionId);
-
-    // Helper: go back to this submission's overview reliably via the header entry link
+    // Helper: click the "Prior Notice Overview" link in the left edit-flow sidebar.
+    // Scoped to exclude the top nav / header so it doesn't match the wrong element
+    // (that mismatch was sending us to the PNSI home page).
     async function backToOverview() {
-      const clicked = await page.evaluate((id) => {
-        const links = Array.from(document.querySelectorAll("a"));
-        const link = links.find(l => id && l.textContent.trim() === id);
-        if (link) { link.click(); return true; }
+      const clicked = await page.evaluate(() => {
+        const els = Array.from(document.querySelectorAll("a, li, span, div"));
+        const el = els.find(e =>
+          e.textContent.trim() === "Prior Notice Overview" &&
+          e.children.length === 0 &&
+          !e.closest("nav") &&
+          !e.closest("header")
+        );
+        if (el) {
+          const clickable = el.closest("a, button, li") || el;
+          clickable.click();
+          return true;
+        }
         return false;
-      }, submissionId);
-      if (!clicked) {
-        // fallback: Back to Edit Prior Notice link
-        await page.evaluate(() => {
-          const links = Array.from(document.querySelectorAll("a, button"));
-          const b = links.find(x => x.textContent.includes("Back to: Edit Prior Notice"));
-          if (b) b.click();
-        });
-      }
-      await page.waitForTimeout(5000);
+      });
+      await page.waitForTimeout(6000);
+      return clicked;
+    }
+
+    // Click any left-menu step by its exact label (Angular auto-saves on nav)
+    async function clickSidebar(label) {
+      const clicked = await page.evaluate((text) => {
+        const els = Array.from(document.querySelectorAll("a, li, span, div"));
+        const el = els.find(e =>
+          e.textContent.trim() === text &&
+          e.children.length === 0 &&
+          !e.closest("nav") &&
+          !e.closest("header")
+        );
+        if (el) {
+          const clickable = el.closest("a, button, li") || el;
+          clickable.click();
+          return true;
+        }
+        return false;
+      }, label);
+      await page.waitForTimeout(6000);
+      return clicked;
     }
 
         // Click pencil on Mode of Transportation
@@ -734,19 +752,9 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(500);
     log("Tracking and date updated");
 
-    // Save automatically and return to overview
-    await backToOverview();
-    log("Back on overview after tracking update");
-
-    // Click pencil on Importer Details
-    log("Updating importer details...");
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button"));
-      const pencils = btns.filter(b => b.querySelector("mat-icon, i"));
-      // Importer pencil is usually the last one in the overview
-      if (pencils.length > 0) pencils[pencils.length - 1].click();
-    });
-    await page.waitForTimeout(5000);
+    // Sidebar → Importer Details (auto-saves tracking on nav)
+    const impOk = await clickSidebar("Importer Details");
+    log("Opened Importer Details (sidebar found: " + impOk + ")");
 
 
     // Fill importer name
@@ -822,8 +830,8 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(300);
 
     // Save automatically and return to overview
-    await backToOverview();
-    log("Importer details saved");
+    const backOk = await backToOverview();
+    log("Importer details saved (sidebar link found: " + backOk + ")");
 
     const overviewCheck = await page.evaluate(() => document.body.innerText);
     log("Overview check: " + overviewCheck.substring(0, 300));
