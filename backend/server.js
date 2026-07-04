@@ -712,22 +712,31 @@ app.post("/duplicate-pnc", async (req, res) => {
 
         // Click pencil on Mode of Transportation
     log("Updating tracking number...");
-    await page.evaluate(() => {
-      // Find the edit pencil next to MODE OF TRANSPORTATION section
-      const sections = Array.from(document.querySelectorAll("*"));
-      const modeSection = sections.find(el => el.textContent.includes("MODE OF TRANSPORTATION"));
-      if (modeSection) {
-        const pencil = modeSection.querySelector("button");
-        if (pencil) { pencil.click(); return; }
+    const pencilResult = await page.evaluate(() => {
+      const norm = (s) => (s || "").replace(/\s+/g, " ").trim();
+      // Find the smallest element whose OWN text is the heading (a leaf, not <html>)
+      const all = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6,span,div,a,p"));
+      const heading = all.find(e =>
+        e.children.length <= 2 &&
+        norm(e.textContent).toUpperCase().includes("MODE OF") &&
+        norm(e.textContent).length < 80
+      );
+      if (!heading) return "no heading";
+      // Walk up a few levels and grab the first button in that container
+      let node = heading;
+      for (let i = 0; i < 5 && node; i++) {
+        const btn = node.querySelector && node.querySelector("button");
+        if (btn) { btn.click(); return "clicked via heading container L" + i; }
+        node = node.parentElement;
       }
-      // Fallback: click first pencil icon button
-      const btns = Array.from(document.querySelectorAll("button"));
-      const pencils = btns.filter(b => b.innerHTML.includes("edit") || b.querySelector("mat-icon, i"));
-      if (pencils.length > 0) pencils[0].click();
+      return "heading found, no button";
     });
+    log("Pencil: " + pencilResult);
 
-    // Wait for carrier page to load
-    await page.waitForTimeout(4000);
+    // Wait for carrier form to load, confirm the tracking field exists
+    await page.waitForSelector("#trackingNumber", { timeout: 15000 }).catch(() => {});
+    const formOpen = await page.evaluate(() => !!document.querySelector("#trackingNumber"));
+    log("Carrier form open: " + formOpen);
 
     // Update tracking number
     await page.click("#trackingNumber", { clickCount: 3 }).catch(() => {});
