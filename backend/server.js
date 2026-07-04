@@ -664,6 +664,32 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(8000);
     log("Reached Prior Notice Overview");
 
+    // Capture the new submission ID (the entry identifier link in the header)
+    const submissionId = await page.evaluate(() => {
+      const m = document.body.innerText.match(/###-\d+-\d+/);
+      return m ? m[0] : null;
+    });
+    log("New submission ID: " + submissionId);
+
+    // Helper: go back to this submission's overview reliably via the header entry link
+    async function backToOverview() {
+      const clicked = await page.evaluate((id) => {
+        const links = Array.from(document.querySelectorAll("a"));
+        const link = links.find(l => id && l.textContent.trim() === id);
+        if (link) { link.click(); return true; }
+        return false;
+      }, submissionId);
+      if (!clicked) {
+        // fallback: Back to Edit Prior Notice link
+        await page.evaluate(() => {
+          const links = Array.from(document.querySelectorAll("a, button"));
+          const b = links.find(x => x.textContent.includes("Back to: Edit Prior Notice"));
+          if (b) b.click();
+        });
+      }
+      await page.waitForTimeout(5000);
+    }
+
         // Click pencil on Mode of Transportation
     log("Updating tracking number...");
     await page.evaluate(() => {
@@ -681,11 +707,7 @@ app.post("/duplicate-pnc", async (req, res) => {
     });
 
     // Wait for carrier page to load
-    await page.waitForFunction(() =>
-      document.body.innerText.includes("IATA") || document.body.innerText.includes("Tracking"),
-      { timeout: 15000 }
-    ).catch(() => {});
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(4000);
 
     // Update tracking number
     await page.click("#trackingNumber", { clickCount: 3 }).catch(() => {});
@@ -712,15 +734,8 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(500);
     log("Tracking and date updated");
 
-    // Click Prior Notice Overview to save and return
-    await page.locator("text=Prior Notice Overview").first().click().catch(async () => {
-      await page.evaluate(() => {
-        const all = Array.from(document.querySelectorAll("a, li, span"));
-        const el = all.find(e => e.textContent.trim() === "Prior Notice Overview");
-        if (el) el.click();
-      });
-    });
-    await page.waitForTimeout(5000);
+    // Save automatically and return to overview
+    await backToOverview();
     log("Back on overview after tracking update");
 
     // Click pencil on Importer Details
@@ -806,34 +821,9 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.keyboard.type(importer.zip, { delay: 100 });
     await page.waitForTimeout(300);
 
-    // Save importer
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE"));
-      if (btn) btn.click();
-    });
-    await page.waitForTimeout(5000);
+    // Save automatically and return to overview
+    await backToOverview();
     log("Importer details saved");
-
-    // Now handle each food article    log("Importer details saved");
-    await page.waitForTimeout(3000);
-
-            // Click SAVE & CONTINUE to get back to overview
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const btn = btns.find(b => b.textContent.includes("SAVE & CONTINUE") || b.textContent.includes("Save & Continue"));
-      if (btn) btn.click();
-    });
-    await page.waitForTimeout(5000);
-
-    // Now click Prior Notice Overview in sidebar
-    await page.evaluate(() => {
-      const all = Array.from(document.querySelectorAll("a, li, span, div"));
-      const el = all.find(e => e.textContent.trim() === "Prior Notice Overview");
-      if (el) el.click();
-    });
-    await page.waitForTimeout(5000);
-
 
     const overviewCheck = await page.evaluate(() => document.body.innerText);
     log("Overview check: " + overviewCheck.substring(0, 300));
