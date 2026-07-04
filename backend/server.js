@@ -1,6 +1,6 @@
 require("dotenv").config();
 const express = require("express");
-const cors = require("cors");
+const cors = require("cors"); 
 const { chromium } = require("playwright-core");
 
 const app = express(); 
@@ -569,6 +569,9 @@ app.post("/duplicate-pnc", async (req, res) => {
   const logs = [];
   const log = (msg) => { console.log("[DUP] " + msg); logs.push(msg); };
 
+  // Respond immediately, process in background
+  res.json({ success: true, status: "processing", message: "PNC duplication started, check logs" });
+
   try {
     log("Navigating to PNSI...");
     await page.waitForTimeout(3000);
@@ -1029,12 +1032,14 @@ app.post("/duplicate-pnc", async (req, res) => {
     const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
     log("Confirmation: " + confirmationNumber);
 
-    res.json({ success: true, logs, confirmationNumber, status: "submitted" });
+    log("Confirmation: " + confirmationNumber);
+    session.dupResult = { success: true, confirmationNumber, logs };
 
   } catch (err) {
     log("ERROR: " + err.message);
-    res.status(500).json({ success: false, error: err.message, logs });
+    session.dupResult = { success: false, error: err.message, logs };
   }
 });
+
 
 app.listen(PORT, () => console.log("Server running on port " + PORT));
