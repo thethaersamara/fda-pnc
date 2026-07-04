@@ -689,23 +689,25 @@ app.post("/duplicate-pnc", async (req, res) => {
 
     // Click any left-menu step by its exact label (Angular auto-saves on nav)
     async function clickSidebar(label) {
-      const clicked = await page.evaluate((text) => {
-        const els = Array.from(document.querySelectorAll("a, li, span, div"));
-        const el = els.find(e =>
-          e.textContent.trim() === text &&
-          e.children.length === 0 &&
-          !e.closest("nav") &&
-          !e.closest("header")
-        );
+      const result = await page.evaluate((text) => {
+        const norm = (s) => s.replace(/\s+/g, " ").trim();
+        const els = Array.from(document.querySelectorAll("a, li, span, div, button"));
+        // exact leaf match first
+        let el = els.find(e => e.children.length === 0 && norm(e.textContent) === text);
+        // then contains match on a short leaf
+        if (!el) el = els.find(e => e.children.length === 0 && norm(e.textContent).includes(text) && norm(e.textContent).length < text.length + 15);
         if (el) {
           const clickable = el.closest("a, button, li") || el;
           clickable.click();
-          return true;
+          return "clicked:" + el.tagName;
         }
-        return false;
+        // debug: list all short leaf texts
+        const leaves = els.filter(e => e.children.length === 0 && norm(e.textContent).length > 0 && norm(e.textContent).length < 40)
+          .map(e => norm(e.textContent));
+        return "MISS | leaves: " + JSON.stringify([...new Set(leaves)].slice(0, 40));
       }, label);
       await page.waitForTimeout(6000);
-      return clicked;
+      return result;
     }
 
         // Click pencil on Mode of Transportation
@@ -754,7 +756,7 @@ app.post("/duplicate-pnc", async (req, res) => {
 
     // Sidebar → Importer Details (auto-saves tracking on nav)
     const impOk = await clickSidebar("Importer Details");
-    log("Opened Importer Details (sidebar found: " + impOk + ")");
+    log("Opened Importer Details: " + impOk);
 
 
     // Fill importer name
@@ -830,8 +832,8 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(300);
 
     // Save automatically and return to overview
-    const backOk = await backToOverview();
-    log("Importer details saved (sidebar link found: " + backOk + ")");
+    const backOk = await clickSidebar("Prior Notice Overview");
+    log("Back to overview: " + backOk);
 
     const overviewCheck = await page.evaluate(() => document.body.innerText);
     log("Overview check: " + overviewCheck.substring(0, 300));
