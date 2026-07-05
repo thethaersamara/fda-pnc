@@ -594,13 +594,17 @@ app.post("/duplicate-pnc", async (req, res) => {
     }).catch(() => {});
     await page.waitForTimeout(3000);
 
-    // Click Submissions tab
-    log("Clicking Submissions tab...");
-    await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("a, button"));
-      const btn = btns.find(b => b.textContent.trim() === "Submissions");
-      if (btn) btn.click();
+      log("Clicking Submissions tab...");
+    const subClick = await page.evaluate(() => {
+      const els = Array.from(document.querySelectorAll("a, button, span, div"));
+      const el = els.find(e => e.textContent.replace(/\s+/g," ").trim() === "Submissions");
+      if (el) { (el.closest("a,button") || el).click(); return true; }
+      return false;
     });
+    log("Submissions clicked: " + subClick);
+    await page.waitForTimeout(6000);
+    const onSubs = await page.evaluate(() => document.body.innerText.includes("ENTRY NUMBER") || document.body.innerText.includes("Manage Submissions") ? "on Submissions page" : "NOT on submissions: " + document.body.innerText.slice(0,120));
+    log("After Submissions click: " + onSubs);
     await page.waitForTimeout(5000);
 
     // Type entry number in search field
