@@ -633,13 +633,19 @@ app.post("/duplicate-pnc", async (req, res) => {
     });
     
     // Wait for the result row to actually render
-    await page.waitForFunction(() =>
+       await page.waitForFunction(() =>
       /###-\d+-\d+/.test(document.body.innerText),
       { timeout: 20000 }
     ).catch(() => {});
     await page.waitForTimeout(2000);
-    log("Search done");
 
+    const searchState = await page.evaluate(() => {
+      const val = (document.querySelector("input") || {}).value || "";
+      const hasRow = /###-\d+-\d+/.test(document.body.innerText);
+      const rowCount = document.querySelectorAll("tr").length;
+      return "typed=" + val + " | hasRow=" + hasRow + " | rows=" + rowCount + " | head=" + document.body.innerText.slice(0,80);
+    });
+    log("Search state: " + searchState);
 
         // Click Copy icon on the result row
     const copyIcon = await page.evaluate(() => {
