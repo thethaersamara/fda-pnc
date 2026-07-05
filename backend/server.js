@@ -888,13 +888,16 @@ app.post("/duplicate-pnc", async (req, res) => {
     const backOk = await page.evaluate(() => /FOOD ARTICLES|Food Article Count/i.test(document.body.innerText));
     log("Back to overview: " + backOk);
 
-    const overviewCheck = await page.evaluate(() => document.body.innerText);
-    log("Overview check: " + overviewCheck.substring(0, 300));
-    await page.waitForFunction(() =>
-      /In Progress|Added to Prior Notice|Food Article Status/i.test(document.body.innerText),
-      { timeout: 20000 }
-    ).catch(() => {});
-    await page.waitForTimeout(3000);
+        const tableProbe = await page.evaluate(() => {
+      return {
+        title: (document.querySelector("h1,h2") || {}).textContent || "none",
+        rows: document.querySelectorAll("tr").length,
+        hasArticleWords: /Tahini|Chili|Olive|Pickled/i.test(document.body.innerText),
+        btns: Array.from(document.querySelectorAll("button,a")).map(b=>b.textContent.replace(/\s+/g," ").trim()).filter(t=>t.length>2&&t.length<40).slice(0,20)
+      };
+    });
+    log("Table probe: " + JSON.stringify(tableProbe));
+
 
     log("Processing food articles...");
     let articlesDone = false;
