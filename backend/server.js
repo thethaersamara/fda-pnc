@@ -806,9 +806,29 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(500);
     log("Tracking and date updated");
 
-    // Sidebar → Importer Details (auto-saves tracking on nav)
-    const impOk = await clickSidebar("Importer Details");
+        // Save tracking by going to overview, then open Importer via its pencil
+    await clickSidebar("Prior Notice Overview");
+    await page.waitForTimeout(4000);
+
+    const impOk = await page.evaluate(() => {
+      const norm = s => (s||"").replace(/\s+/g," ").trim();
+      const all = Array.from(document.querySelectorAll("*"));
+      const heading = all.find(e =>
+        /IMPORTER DETAILS/i.test(norm(e.textContent)) &&
+        norm(e.textContent).length < 60 &&
+        e.tagName !== "HTML" && e.tagName !== "BODY"
+      );
+      if (!heading) return "no heading";
+      let node = heading;
+      for (let i = 0; i < 6 && node; i++) {
+        const btn = node.querySelector && node.querySelector("button");
+        if (btn) { btn.click(); return "clicked L" + i; }
+        node = node.parentElement;
+      }
+      return "heading found no button";
+    });
     log("Opened Importer Details: " + impOk);
+    await page.waitForTimeout(4000);
 
 
     // Fill importer name
