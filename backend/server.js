@@ -877,8 +877,14 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(4000);
 
     // then go to overview
-    const backOk = await clickSidebar("Prior Notice Overview");
+        const backOk = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll("a, button, span, div"));
+      const el = links.find(e => /Back to:\s*Edit Prior Notice/i.test(e.textContent) && e.textContent.replace(/\s+/g," ").trim().length < 40);
+      if (el) { (el.closest("a,button")||el).click(); return true; }
+      return false;
+    });
     log("Back to overview: " + backOk);
+    await page.waitForTimeout(5000);
 
 
     const overviewCheck = await page.evaluate(() => document.body.innerText);
