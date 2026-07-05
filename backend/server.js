@@ -615,19 +615,21 @@ app.post("/duplicate-pnc", async (req, res) => {
     log("On submissions page: " + onSubs);
 
 
-    // Type entry number in search field
-    log("Searching for PNC: " + sourcePncId);
-    await page.evaluate((id) => {
+        log("Searching for PNC: " + sourcePncId);
+    const typed = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll("input"));
-      const field = inputs.find(i =>
-        i.placeholder && i.placeholder.toLowerCase().includes("entry") ||
-        i.id && i.id.toLowerCase().includes("entry")
-      );
-      if (field) { field.focus(); field.click(); }
-    }, sourcePncId);
-    await page.keyboard.press("Control+A");
-    await page.keyboard.press("Backspace");
-    await page.keyboard.type(sourcePncId, { delay: 100 });
+      let field = inputs.find(i => {
+        const box = i.closest("div,section,form");
+        return box && /ENTRY NUMBER/i.test(box.textContent);
+      });
+      if (!field) field = inputs.find(i => i.type === "text" || !i.type);
+      if (!field) return "no field";
+      field.focus();
+      field.value = "";
+      return "focused:" + (field.placeholder || field.id || field.name || "unnamed");
+    });
+    log("Entry field: " + typed);
+    await page.keyboard.type(sourcePncId, { delay: 80 });
     await page.waitForTimeout(500);
 
         // Click Search
@@ -637,6 +639,13 @@ app.post("/duplicate-pnc", async (req, res) => {
       const b = btns.find(x => norm(x.textContent).toUpperCase() === "SEARCH");
       if (b) b.click();
     });
+        const searchState = await page.evaluate(() => {
+      const rows = document.querySelectorAll("tr").length;
+      const hasRow = /###-\d+-\d+/.test(document.body.innerText);
+      return "hasRow=" + hasRow + " rows=" + rows;
+    });
+    log("Search state: " + searchState);
+
     
     // Wait for the result row to actually render
        await page.waitForFunction(() =>
