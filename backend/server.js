@@ -890,6 +890,11 @@ app.post("/duplicate-pnc", async (req, res) => {
 
     const overviewCheck = await page.evaluate(() => document.body.innerText);
     log("Overview check: " + overviewCheck.substring(0, 300));
+    await page.waitForFunction(() =>
+      /In Progress|Added to Prior Notice|Food Article Status/i.test(document.body.innerText),
+      { timeout: 20000 }
+    ).catch(() => {});
+    await page.waitForTimeout(3000);
 
     log("Processing food articles...");
     let articlesDone = false;
