@@ -776,27 +776,6 @@ app.post("/duplicate-pnc", async (req, res) => {
     });
     log("Pencil: " + pencilResult);
 
-      // Miss: dump every button with its icon text + nearby heading, so we can see the real structure
-      const btns = Array.from(document.querySelectorAll("button"));
-      const dump = btns.slice(0, 25).map((b, i) => {
-        const icon = norm(b.textContent) || (b.querySelector("mat-icon") ? b.querySelector("mat-icon").textContent : "");
-        const near = norm((b.closest("div,section,mat-card") || b).textContent).slice(0, 40);
-        return i + ":[" + icon + "]~" + near;
-      });
-      return "MISS | buttons: " + JSON.stringify(dump);
-    });
-    log("Pencil: " + pencilResult);
-      // Miss: dump every button with its icon text + nearby heading, so we can see the real structure
-      const btns = Array.from(document.querySelectorAll("button"));
-      const dump = btns.slice(0, 25).map((b, i) => {
-        const icon = norm(b.textContent) || (b.querySelector("mat-icon") ? b.querySelector("mat-icon").textContent : "");
-        const near = norm((b.closest("div,section,mat-card") || b).textContent).slice(0, 40);
-        return i + ":[" + icon + "]~" + near;
-      });
-      return "MISS | buttons: " + JSON.stringify(dump);
-    });
-    log("Pencil: " + pencilResult);
-
     // Wait for carrier form to load, confirm the tracking field exists
     await page.waitForSelector("#trackingNumber", { timeout: 15000 }).catch(() => {});
     const formOpen = await page.evaluate(() => !!document.querySelector("#trackingNumber"));
