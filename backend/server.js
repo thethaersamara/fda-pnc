@@ -832,17 +832,15 @@ app.post("/duplicate-pnc", async (req, res) => {
 
 
     // Fill importer name
-    const importerNameField = await page.evaluate(() => {
-      const inputs = Array.from(document.querySelectorAll("input"));
-      const field = inputs.find(i => i.placeholder && i.placeholder.toLowerCase().includes("name") ||
-        i.id && i.id.toLowerCase().includes("name"));
-      if (field) { field.focus(); field.click(); return "found"; }
-      return "not found";
+        log("Opened Importer Details: " + impOk);
+    await page.waitForTimeout(4000);
+
+    const formDump = await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll("input, select, textarea"));
+      return inputs.map((i, n) => n + ":" + i.tagName + "[" + (i.type||"") + "] ph=" + (i.placeholder||"") + " id=" + (i.id||"") + " name=" + (i.name||"")).slice(0, 30);
     });
-    await page.keyboard.press("Control+A");
-    await page.keyboard.press("Backspace");
-    await page.keyboard.type(importer.name, { delay: 100 });
-    await page.waitForTimeout(300);
+    log("Importer form fields: " + JSON.stringify(formDump));
+
 
     // Fill street address
     await page.evaluate(() => {
