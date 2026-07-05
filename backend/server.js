@@ -828,6 +828,13 @@ app.post("/duplicate-pnc", async (req, res) => {
       return "heading found no button";
     });
     log("Opened Importer Details: " + impOk);
+        const whichForm = await page.evaluate(() => {
+      const t = document.body.innerText;
+      if (/ARE YOU THE IMPORTER/i.test(t)) return "IMPORTER form";
+      if (/ARE YOU THE SUBMITTER|SUBMITTER INFORMATION/i.test(t)) return "SUBMITTER form";
+      return "other: " + t.slice(0,60);
+    });
+    log("Landed on: " + whichForm);
     await page.waitForTimeout(4000);
 
            // Fill importer fields by exact ID
