@@ -646,13 +646,24 @@ app.post("/duplicate-pnc", async (req, res) => {
     });
     await page.waitForTimeout(5000);
 
-    // Select ALL articles - click top checkbox
-    log("Selecting all articles...");
-    await page.evaluate(() => {
-      const checkboxes = Array.from(document.querySelectorAll("input[type='checkbox']"));
-      if (checkboxes.length > 0) checkboxes[0].click();
+        // After CONFIRM, dump what's on screen before selecting articles
+    await page.waitForTimeout(3000);
+    const afterConfirm = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      return btns.slice(0, 20).map((b, i) => i + ":" + b.textContent.replace(/\s+/g, " ").trim().slice(0, 45)).filter(x => x.length > 3);
     });
-    await page.waitForTimeout(1000);
+    log("After confirm, buttons: " + JSON.stringify(afterConfirm));
+
+    // Select ALL articles - top checkbox
+    log("Selecting all articles...");
+    const allChecked = await page.evaluate(() => {
+      const cbs = Array.from(document.querySelectorAll("input[type='checkbox']"));
+      if (cbs.length > 0) { cbs[0].click(); return cbs.length; }
+      return 0;
+    });
+    log("Checkboxes found: " + allChecked);
+    await page.waitForTimeout(1500);
+;
 
         // Click COPY WITH SELECTED FOOD ARTICLES
     log("Copying with selected food articles...");
