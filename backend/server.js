@@ -654,38 +654,27 @@ app.post("/duplicate-pnc", async (req, res) => {
     });
     await page.waitForTimeout(1000);
 
-    // Click COPY WITH SELECTED FOOD ARTICLES
+        // Click COPY WITH SELECTED FOOD ARTICLES
     log("Copying with selected food articles...");
-    await page.evaluate(() => {
+    const copyClicked = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
       const btn = btns.find(b => b.textContent.includes("COPY WITH SELECTED FOOD ARTICLES"));
-      if (btn) btn.click();
+      if (btn) { btn.click(); return true; }
+      return false;
     });
-    await page.waitForTimeout(8000);
-    log("Reached Prior Notice Overview");
+    log("Copy button clicked: " + copyClicked);
 
-    // Helper: click the "Prior Notice Overview" link in the left edit-flow sidebar.
-    // Scoped to exclude the top nav / header so it doesn't match the wrong element
-    // (that mismatch was sending us to the PNSI home page).
-    async function backToOverview() {
-      const clicked = await page.evaluate(() => {
-        const els = Array.from(document.querySelectorAll("a, li, span, div"));
-        const el = els.find(e =>
-          e.textContent.trim() === "Prior Notice Overview" &&
-          e.children.length === 0 &&
-          !e.closest("nav") &&
-          !e.closest("header")
-        );
-        if (el) {
-          const clickable = el.closest("a, button, li") || el;
-          clickable.click();
-          return true;
-        }
-        return false;
-      });
-      await page.waitForTimeout(6000);
-      return clicked;
-    }
+    // Wait for the submission page to actually load (Food Articles table appears)
+    await page.waitForFunction(() =>
+      document.body.innerText.includes("FOOD ARTICLES") ||
+      document.body.innerText.includes("SUBMIT TO FDA") ||
+      document.body.innerText.includes("MODE OF"),
+      { timeout: 20000 }
+    ).catch(() => {});
+    await page.waitForTimeout(3000);
+
+    const afterCopy = await page.evaluate(() => document.body.innerText.substring(0, 200));
+    log("After copy landed on: " + afterCopy);
 
     // Click any left-menu step by its exact label (Angular auto-saves on nav)
     async function clickSidebar(label) {
