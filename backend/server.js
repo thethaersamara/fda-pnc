@@ -905,6 +905,8 @@ app.post("/duplicate-pnc", async (req, res) => {
       { timeout: 20000 }
     ).catch(() => {});
     await page.waitForTimeout(3000);
+    const fullText = await page.evaluate(() => document.body.innerText.replace(/\s+/g," ").slice(0, 600));
+    log("Page text: " + fullText);
 
     log("Processing food articles...");
     let articlesDone = false;
