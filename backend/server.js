@@ -830,76 +830,41 @@ app.post("/duplicate-pnc", async (req, res) => {
     log("Opened Importer Details: " + impOk);
     await page.waitForTimeout(4000);
 
+           // Fill importer fields by exact ID
+    async function setField(id, value) {
+      const ok = await page.evaluate((fid) => {
+        const el = document.getElementById(fid);
+        if (!el) return false;
+        el.focus(); el.click();
+        return true;
+      }, id);
+      if (ok) {
+        await page.keyboard.press("Control+A");
+        await page.keyboard.press("Backspace");
+        await page.keyboard.type(value, { delay: 60 });
+        await page.waitForTimeout(200);
+      }
+      return ok;
+    }
 
-    // Fill importer name
-        log("Opened Importer Details: " + impOk);
-    await page.waitForTimeout(4000);
+    const nameOk = await setField("businessNameTxt", importer.name);
+    const addrOk = await setField("streetAddress", importer.address);
+    const cityOk = await setField("city", importer.city);
+    const zipOk  = await setField("zipTxt", importer.zip);
+    log("Importer fills: name=" + nameOk + " addr=" + addrOk + " city=" + cityOk + " zip=" + zipOk);
 
-    const formDump = await page.evaluate(() => {
-      const inputs = Array.from(document.querySelectorAll("input, select, textarea"));
-      return inputs.map((i, n) => n + ":" + i.tagName + "[" + (i.type||"") + "] ph=" + (i.placeholder||"") + " id=" + (i.id||"") + " name=" + (i.name||"")).slice(0, 30);
-    });
-    log("Importer form fields: " + JSON.stringify(formDump));
-
-
-    // Fill street address
-    await page.evaluate(() => {
-      const inputs = Array.from(document.querySelectorAll("input, textarea"));
-      const field = inputs.find(i =>
-        (i.placeholder && i.placeholder.toLowerCase().includes("address")) ||
-        (i.id && i.id.toLowerCase().includes("address"))
-      );
-      if (field) { field.focus(); field.click(); }
-    });
-    await page.keyboard.press("Control+A");
-    await page.keyboard.press("Backspace");
-    await page.keyboard.type(importer.address, { delay: 100 });
-    await page.waitForTimeout(300);
-
-    // Fill city
-    await page.evaluate(() => {
-      const inputs = Array.from(document.querySelectorAll("input"));
-      const field = inputs.find(i =>
-        (i.placeholder && i.placeholder.toLowerCase().includes("city")) ||
-        (i.id && i.id.toLowerCase().includes("city"))
-      );
-      if (field) { field.focus(); field.click(); }
-    });
-    await page.keyboard.press("Control+A");
-    await page.keyboard.press("Backspace");
-    await page.keyboard.type(importer.city, { delay: 100 });
-    await page.waitForTimeout(300);
-
-    // Select state
-    await page.locator("select[name='state'], select[id*='state']").selectOption({ label: importer.state }).catch(async () => {
-      await page.evaluate((state) => {
-        const sels = Array.from(document.querySelectorAll("select"));
-        for (const sel of sels) {
-          const opt = Array.from(sel.options).find(o => o.text.includes(state));
-          if (opt) {
-            sel.value = opt.value;
-            ["input", "change", "blur"].forEach(ev =>
-              sel.dispatchEvent(new Event(ev, { bubbles: true }))
-            );
-          }
+    // State dropdown (importer uses countrySubDivision, not 'state')
+    await page.evaluate((state) => {
+      const sel = document.getElementById("countrySubDivision");
+      if (sel) {
+        const opt = Array.from(sel.options).find(o => o.text.includes(state));
+        if (opt) {
+          sel.value = opt.value;
+          ["input","change","blur"].forEach(ev => sel.dispatchEvent(new Event(ev,{bubbles:true})));
         }
-      }, importer.state);
-    });
+      }
+    }, importer.state);
     await page.waitForTimeout(500);
-
-    // Fill zip
-    await page.evaluate(() => {
-      const inputs = Array.from(document.querySelectorAll("input"));
-      const field = inputs.find(i =>
-        (i.placeholder && i.placeholder.toLowerCase().includes("zip")) ||
-        (i.id && i.id.toLowerCase().includes("zip"))
-      );
-      if (field) { field.focus(); field.click(); }
-    });
-    await page.keyboard.press("Control+A");
-    await page.keyboard.press("Backspace");
-    await page.keyboard.type(importer.zip, { delay: 100 });
-    await page.waitForTimeout(300);
 
     // Save automatically and return to overview
     const backOk = await clickSidebar("Prior Notice Overview");
