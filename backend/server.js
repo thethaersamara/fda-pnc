@@ -888,15 +888,18 @@ app.post("/duplicate-pnc", async (req, res) => {
     const backOk = await page.evaluate(() => /FOOD ARTICLES|Food Article Count/i.test(document.body.innerText));
     log("Back to overview: " + backOk);
 
-        const tableProbe = await page.evaluate(() => {
-      return {
-        title: (document.querySelector("h1,h2") || {}).textContent || "none",
-        rows: document.querySelectorAll("tr").length,
-        hasArticleWords: /Tahini|Chili|Olive|Pickled/i.test(document.body.innerText),
-        btns: Array.from(document.querySelectorAll("button,a")).map(b=>b.textContent.replace(/\s+/g," ").trim()).filter(t=>t.length>2&&t.length<40).slice(0,20)
-      };
+            await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const b = btns.find(x => x.textContent.replace(/\s+/g," ").trim() === "Continue");
+      if (b) b.click();
     });
-    log("Table probe: " + JSON.stringify(tableProbe));
+    await page.waitForTimeout(5000);
+    const probe2 = await page.evaluate(() => ({
+      rows: document.querySelectorAll("tr").length,
+      hasArticles: /Tahini|Chili|Olive|Pickled|In Progress/i.test(document.body.innerText),
+      title: (document.querySelector("h1,h2")||{}).textContent || "none"
+    }));
+    log("After Continue: " + JSON.stringify(probe2));
 
 
     log("Processing food articles...");
