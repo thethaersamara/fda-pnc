@@ -714,22 +714,37 @@ app.post("/duplicate-pnc", async (req, res) => {
     log("Updating tracking number...");
     const pencilResult = await page.evaluate(() => {
       const norm = (s) => (s || "").replace(/\s+/g, " ").trim();
-      // Find the smallest element whose OWN text is the heading (a leaf, not <html>)
-      const all = Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6,span,div,a,p"));
+
+      // Find any element that contains the heading text but is small (not <html>/<body>)
+      const all = Array.from(document.querySelectorAll("*"));
       const heading = all.find(e =>
-        e.children.length <= 2 &&
         norm(e.textContent).toUpperCase().includes("MODE OF") &&
-        norm(e.textContent).length < 80
+        norm(e.textContent).length < 120 &&
+        e.tagName !== "HTML" && e.tagName !== "BODY"
       );
-      if (!heading) return "no heading";
-      // Walk up a few levels and grab the first button in that container
-      let node = heading;
-      for (let i = 0; i < 5 && node; i++) {
-        const btn = node.querySelector && node.querySelector("button");
-        if (btn) { btn.click(); return "clicked via heading container L" + i; }
-        node = node.parentElement;
+
+      if (heading) {
+        let node = heading;
+        for (let i = 0; i < 8 && node; i++) {
+          const btn = node.querySelector && node.querySelector("button, a[role='button'], mat-icon");
+          if (btn) {
+            const target = btn.closest("button, a") || btn;
+            target.click();
+            return "clicked L" + i + " <" + target.tagName + ">";
+          }
+          node = node.parentElement;
+        }
+        return "heading found, no button nearby";
       }
-      return "heading found, no button";
+
+      // Miss: dump every button with its icon text + nearby heading, so we can see the real structure
+      const btns = Array.from(document.querySelectorAll("button"));
+      const dump = btns.slice(0, 25).map((b, i) => {
+        const icon = norm(b.textContent) || (b.querySelector("mat-icon") ? b.querySelector("mat-icon").textContent : "");
+        const near = norm((b.closest("div,section,mat-card") || b).textContent).slice(0, 40);
+        return i + ":[" + icon + "]~" + near;
+      });
+      return "MISS | buttons: " + JSON.stringify(dump);
     });
     log("Pencil: " + pencilResult);
 
