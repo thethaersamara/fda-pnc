@@ -900,7 +900,11 @@ app.post("/duplicate-pnc", async (req, res) => {
       title: (document.querySelector("h1,h2")||{}).textContent || "none"
     }));
     log("After Continue: " + JSON.stringify(probe2));
-
+    await page.waitForFunction(() =>
+      document.querySelectorAll("tr").length > 1,
+      { timeout: 20000 }
+    ).catch(() => {});
+    await page.waitForTimeout(3000);
 
     log("Processing food articles...");
     let articlesDone = false;
