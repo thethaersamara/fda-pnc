@@ -872,7 +872,11 @@ app.post("/duplicate-pnc", async (req, res) => {
       }
     }, importer.state);
     await page.waitForTimeout(500);
-
+const nameCheck = await page.evaluate(() => {
+      const n = document.getElementById("businessNameTxt");
+      return n ? n.value : "no field";
+    });
+    log("Name field before save: " + nameCheck)
    // Importer form needs an explicit save, not just nav
     const savedImp = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
