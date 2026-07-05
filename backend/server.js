@@ -866,9 +866,20 @@ app.post("/duplicate-pnc", async (req, res) => {
     }, importer.state);
     await page.waitForTimeout(500);
 
-    // Save automatically and return to overview
+   // Importer form needs an explicit save, not just nav
+    const savedImp = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      const b = btns.find(x => /SAVE\s*&\s*CONTINUE/i.test(x.textContent));
+      if (b) { b.click(); return true; }
+      return false;
+    });
+    log("Importer saved via S&C: " + savedImp);
+    await page.waitForTimeout(4000);
+
+    // then go to overview
     const backOk = await clickSidebar("Prior Notice Overview");
     log("Back to overview: " + backOk);
+
 
     const overviewCheck = await page.evaluate(() => document.body.innerText);
     log("Overview check: " + overviewCheck.substring(0, 300));
@@ -896,17 +907,25 @@ app.post("/duplicate-pnc", async (req, res) => {
       log("Processing article " + articleCount + "...");
       await page.waitForTimeout(5000);
 
-      // Click Ultimate Consignee in sidebar
-      await page.evaluate(() => {
+            // Click Ultimate Consignee in sidebar
+      const ucClick = await page.evaluate(() => {
         const all = Array.from(document.querySelectorAll("*"));
         const el = all.find(e =>
           e.children.length === 0 &&
           e.textContent.trim() === "Ultimate Consignee" &&
           e.tagName !== "SCRIPT"
         );
-        if (el) { el.click(); const parent = el.closest("a, button, li"); if (parent) parent.click(); }
+        if (el) { const p = el.closest("a, button, li") || el; p.click(); return true; }
+        return false;
       });
       await page.waitForTimeout(3000);
+
+      const ucDump = await page.evaluate(() => {
+        const inputs = Array.from(document.querySelectorAll("input, select, textarea"));
+        return inputs.map((i, n) => n + ":" + i.tagName + "[" + (i.type||"") + "] id=" + (i.id||"") + " name=" + (i.name||"")).slice(0, 40);
+      });
+      log("UC click: " + ucClick + " | UC fields: " + JSON.stringify(ucDump));
+
 
       // Fill ultimate consignee - same importer info
       // Name
