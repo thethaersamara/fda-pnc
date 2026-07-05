@@ -594,20 +594,26 @@ app.post("/duplicate-pnc", async (req, res) => {
     }).catch(() => {});
     await page.waitForTimeout(3000);
 
-         log("Clicking Submissions tab...");
-    const subClick = await page.evaluate(() => {
-      const norm = s => s.replace(/\s+/g, " ").trim();
-      const els = Array.from(document.querySelectorAll("a, button, span, div, li"));
-      // match the nav item whose text ends with "Submissions" (icon name is glued on front)
-      const el = els.find(e => {
-        const t = norm(e.textContent);
-        return /(^|[a-z_])Submissions$/.test(t) && t.length < 40 && !t.includes("PREVIOUS");
-      });
-      if (el) { (el.closest("a,button,li") || el).click(); return true; }
-      return false;
+             log("Clicking Submissions tab...");
+    await page.evaluate(() => {
+      location.hash = "#/submissions";
     });
-    log("Submissions clicked: " + subClick);
-    await page.waitForTimeout(6000);
+    await page.waitForTimeout(3000);
+    // if it didn't route, click the nav item as fallback
+    await page.evaluate(() => {
+      const norm = s => s.replace(/\s+/g," ").trim();
+      const els = Array.from(document.querySelectorAll("a,button,li,span,div"));
+      const el = els.find(e => /(^|[a-z_])Submissions$/.test(norm(e.textContent)) && norm(e.textContent).length < 40 && !/PREVIOUS/i.test(norm(e.textContent)));
+      if (el) (el.closest("a,button,li")||el).click();
+    });
+    await page.waitForFunction(() =>
+      document.body.innerText.includes("ENTRY NUMBER") || document.body.innerText.includes("Manage Submissions"),
+      { timeout: 15000 }
+    ).catch(()=>{});
+    await page.waitForTimeout(2000);
+    const onSubs = await page.evaluate(() => document.body.innerText.includes("ENTRY NUMBER") ? "YES" : "NO: "+document.body.innerText.slice(0,80));
+    log("On submissions page: " + onSubs);
+
 
     // Type entry number in search field
     log("Searching for PNC: " + sourcePncId);
