@@ -885,6 +885,11 @@ app.post("/duplicate-pnc", async (req, res) => {
     });
     log("Back to overview: " + backOk);
     await page.waitForTimeout(5000);
+    const pageButtons = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button, a"));
+      return btns.map(b => b.textContent.replace(/\s+/g," ").trim()).filter(t => t.length > 2 && t.length < 45).slice(0, 30);
+    });
+    log("Buttons on this page: " + JSON.stringify(pageButtons));
 
 
 
