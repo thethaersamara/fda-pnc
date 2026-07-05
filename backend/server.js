@@ -615,14 +615,20 @@ app.post("/duplicate-pnc", async (req, res) => {
     log("On submissions page: " + onSubs);
 
 
-        log("Searching for PNC: " + sourcePncId);
+           log("Searching for PNC: " + sourcePncId);
     const typed = await page.evaluate(() => {
       const inputs = Array.from(document.querySelectorAll("input"));
+      // skip date pickers and selects; find the text input whose immediate label says Entry Number
       let field = inputs.find(i => {
-        const box = i.closest("div,section,form");
-        return box && /ENTRY NUMBER/i.test(box.textContent);
+        if (/date/i.test(i.placeholder || "")) return false;
+        // walk up to find a label/text node mentioning "Entry Number" close by
+        let n = i.parentElement;
+        for (let k = 0; k < 3 && n; k++) {
+          if (/ENTRY NUMBER/i.test(n.textContent) && !/STATUS|DATE|TYPE|SUBMITTER|MODE/i.test(n.textContent.slice(0,40))) return true;
+          n = n.parentElement;
+        }
+        return false;
       });
-      if (!field) field = inputs.find(i => i.type === "text" || !i.type);
       if (!field) return "no field";
       field.focus();
       field.value = "";
@@ -631,6 +637,7 @@ app.post("/duplicate-pnc", async (req, res) => {
     log("Entry field: " + typed);
     await page.keyboard.type(sourcePncId, { delay: 80 });
     await page.waitForTimeout(500);
+
 
   // Click Search
     await page.evaluate(() => {
