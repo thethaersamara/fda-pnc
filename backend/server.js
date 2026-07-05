@@ -876,20 +876,22 @@ app.post("/duplicate-pnc", async (req, res) => {
     log("Importer saved via S&C: " + savedImp);
     await page.waitForTimeout(4000);
 
-    // then go to overview
-           const backOk = await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll("a"));
-      const el = links.find(l => /^###-\d+-\d+$/.test(l.textContent.replace(/\s+/g,"").trim()));
-      if (el) { el.click(); return true; }
-      return false;
+        // then go to overview
+    const subId = await page.evaluate(() => {
+      const m = document.body.innerText.match(/###-\d+-\d+/);
+      return m ? m[0] : null;
     });
-    log("Back to overview: " + backOk);
+    await page.evaluate((id) => { location.hash = "#/submission/" + id; }, subId);
     await page.waitForTimeout(5000);
+    const backOk = await page.evaluate(() => /FOOD ARTICLES|Food Article Count/i.test(document.body.innerText));
+    log("Back to overview: " + backOk + " id=" + subId);
+
     const pageButtons = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll("button, a"));
       return btns.map(b => b.textContent.replace(/\s+/g," ").trim()).filter(t => t.length > 2 && t.length < 45).slice(0, 30);
     });
     log("Buttons on this page: " + JSON.stringify(pageButtons));
+
 
 
 
