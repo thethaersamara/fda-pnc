@@ -774,8 +774,6 @@ app.post("/duplicate-pnc", async (req, res) => {
       }
       return "heading found no button";
     });
- 
-      }
       // Miss: dump every button with its icon text + nearby heading, so we can see the real structure
       const btns = Array.from(document.querySelectorAll("button"));
       const dump = btns.slice(0, 25).map((b, i) => {
