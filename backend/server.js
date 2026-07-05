@@ -594,7 +594,7 @@ app.post("/duplicate-pnc", async (req, res) => {
     }).catch(() => {});
     await page.waitForTimeout(3000);
 
-             log("Clicking Submissions tab...");
+                 log("Clicking Submissions tab...");
     await page.evaluate(() => {
       location.hash = "#/submissions";
     });
