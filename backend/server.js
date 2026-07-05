@@ -754,33 +754,38 @@ app.post("/duplicate-pnc", async (req, res) => {
       return result;
     }
 
-        // Click pencil on Mode of Transportation
-    log("Updating tracking number...");
+           log("Updating tracking number...");
     const pencilResult = await page.evaluate(() => {
-      const norm = (s) => (s || "").replace(/\s+/g, " ").trim();
-
-      // Find any element that contains the heading text but is small (not <html>/<body>)
+      const norm = s => (s||"").replace(/\s+/g," ").trim();
+      // find the MODE OF TRANSPORTATION heading, then the pencil button in its card
       const all = Array.from(document.querySelectorAll("*"));
       const heading = all.find(e =>
-        norm(e.textContent).toUpperCase().includes("MODE OF") &&
-        norm(e.textContent).length < 120 &&
+        /MODE OF TRANSPORTATION/i.test(norm(e.textContent)) &&
+        norm(e.textContent).length < 60 &&
         e.tagName !== "HTML" && e.tagName !== "BODY"
       );
-
-      if (heading) {
-        let node = heading;
-        for (let i = 0; i < 8 && node; i++) {
-          const btn = node.querySelector && node.querySelector("button, a[role='button'], mat-icon");
-          if (btn) {
-            const target = btn.closest("button, a") || btn;
-            target.click();
-            return "clicked L" + i + " <" + target.tagName + ">";
-          }
-          node = node.parentElement;
-        }
-        return "heading found, no button nearby";
+      if (!heading) return "no heading";
+      // walk up to the card, then find its edit pencil (a button, not the section icon)
+      let node = heading;
+      for (let i = 0; i < 6 && node; i++) {
+        const btn = node.querySelector && node.querySelector("button");
+        if (btn) { btn.click(); return "clicked L" + i; }
+        node = node.parentElement;
       }
-
+      return "heading found no button";
+    });
+ 
+      }
+      // Miss: dump every button with its icon text + nearby heading, so we can see the real structure
+      const btns = Array.from(document.querySelectorAll("button"));
+      const dump = btns.slice(0, 25).map((b, i) => {
+        const icon = norm(b.textContent) || (b.querySelector("mat-icon") ? b.querySelector("mat-icon").textContent : "");
+        const near = norm((b.closest("div,section,mat-card") || b).textContent).slice(0, 40);
+        return i + ":[" + icon + "]~" + near;
+      });
+      return "MISS | buttons: " + JSON.stringify(dump);
+    });
+    log("Pencil: " + pencilResult);
       // Miss: dump every button with its icon text + nearby heading, so we can see the real structure
       const btns = Array.from(document.querySelectorAll("button"));
       const dump = btns.slice(0, 25).map((b, i) => {
