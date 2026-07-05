@@ -632,35 +632,27 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.keyboard.type(sourcePncId, { delay: 80 });
     await page.waitForTimeout(500);
 
-        // Click Search
+  // Click Search
     await page.evaluate(() => {
       const norm = s => s.replace(/\s+/g," ").trim();
       const btns = Array.from(document.querySelectorAll("button"));
       const b = btns.find(x => norm(x.textContent).toUpperCase() === "SEARCH");
       if (b) b.click();
     });
-        const searchState = await page.evaluate(() => {
-      const rows = document.querySelectorAll("tr").length;
-      const hasRow = /###-\d+-\d+/.test(document.body.innerText);
-      return "hasRow=" + hasRow + " rows=" + rows;
-    });
-    log("Search state: " + searchState);
 
-    
-    // Wait for the result row to actually render
-       await page.waitForFunction(() =>
+    await page.waitForFunction(() =>
       /###-\d+-\d+/.test(document.body.innerText),
       { timeout: 20000 }
     ).catch(() => {});
     await page.waitForTimeout(2000);
 
     const searchState = await page.evaluate(() => {
-      const val = (document.querySelector("input") || {}).value || "";
+      const rows = document.querySelectorAll("tr").length;
       const hasRow = /###-\d+-\d+/.test(document.body.innerText);
-      const rowCount = document.querySelectorAll("tr").length;
-      return "typed=" + val + " | hasRow=" + hasRow + " | rows=" + rowCount + " | head=" + document.body.innerText.slice(0,80);
+      return "hasRow=" + hasRow + " rows=" + rows;
     });
     log("Search state: " + searchState);
+
 
         // Click Copy icon on the result row
     const copyIcon = await page.evaluate(() => {
