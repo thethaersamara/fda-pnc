@@ -627,15 +627,25 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(5000);
     log("Search done");
 
-    // Click Copy icon (second icon in Actions column)
-    await page.evaluate(() => {
+        // Click Copy icon on the result row
+    const copyIcon = await page.evaluate(() => {
       const rows = Array.from(document.querySelectorAll("tr"));
       for (const row of rows) {
+        if (!/###-\d/.test(row.textContent)) continue; // only the data row
         const btns = Array.from(row.querySelectorAll("button, a"));
-        if (btns.length >= 2) { btns[1].click(); return; }
+        // find the one whose icon is the copy/content_copy glyph
+        const copy = btns.find(b => /content_copy|copy|file_copy/i.test(b.innerHTML));
+        const target = copy || btns[1]; // fallback to 2nd
+        if (target) { target.click(); return "clicked " + (copy ? "copy-icon" : "btns[1]") + " of " + btns.length; }
       }
+      return "no data row / no buttons";
     });
+    log("Copy icon: " + copyIcon);
     await page.waitForTimeout(3000);
+
+    // Dump what appeared - should be the copy confirmation popup
+    const popup = await page.evaluate(() => document.body.innerText.match(/Copy Prior Notice Confirmation|Are you sure you want to copy/i) ? "popup visible" : "NO popup");
+    log("Copy popup: " + popup);
 
     // Click CONFIRM on copy popup
     log("Confirming copy...");
