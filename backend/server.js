@@ -772,8 +772,10 @@ app.post("/duplicate-pnc", async (req, res) => {
         if (btn) { btn.click(); return "clicked L" + i; }
         node = node.parentElement;
       }
-      return "heading found no button";
+    return "heading found no button";
     });
+    log("Pencil: " + pencilResult);
+
       // Miss: dump every button with its icon text + nearby heading, so we can see the real structure
       const btns = Array.from(document.querySelectorAll("button"));
       const dump = btns.slice(0, 25).map((b, i) => {
