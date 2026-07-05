@@ -594,18 +594,20 @@ app.post("/duplicate-pnc", async (req, res) => {
     }).catch(() => {});
     await page.waitForTimeout(3000);
 
-      log("Clicking Submissions tab...");
+         log("Clicking Submissions tab...");
     const subClick = await page.evaluate(() => {
-      const els = Array.from(document.querySelectorAll("a, button, span, div"));
-      const el = els.find(e => e.textContent.replace(/\s+/g," ").trim() === "Submissions");
-      if (el) { (el.closest("a,button") || el).click(); return true; }
+      const norm = s => s.replace(/\s+/g, " ").trim();
+      const els = Array.from(document.querySelectorAll("a, button, span, div, li"));
+      // match the nav item whose text ends with "Submissions" (icon name is glued on front)
+      const el = els.find(e => {
+        const t = norm(e.textContent);
+        return /(^|[a-z_])Submissions$/.test(t) && t.length < 40 && !t.includes("PREVIOUS");
+      });
+      if (el) { (el.closest("a,button,li") || el).click(); return true; }
       return false;
     });
     log("Submissions clicked: " + subClick);
     await page.waitForTimeout(6000);
-    const onSubs = await page.evaluate(() => document.body.innerText.includes("ENTRY NUMBER") || document.body.innerText.includes("Manage Submissions") ? "on Submissions page" : "NOT on submissions: " + document.body.innerText.slice(0,120));
-    log("After Submissions click: " + onSubs);
-    await page.waitForTimeout(5000);
 
     // Type entry number in search field
     log("Searching for PNC: " + sourcePncId);
@@ -622,14 +624,22 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.keyboard.type(sourcePncId, { delay: 100 });
     await page.waitForTimeout(500);
 
-    // Click Search
+        // Click Search
     await page.evaluate(() => {
+      const norm = s => s.replace(/\s+/g," ").trim();
       const btns = Array.from(document.querySelectorAll("button"));
-      const btn = btns.find(b => b.textContent.trim() === "SEARCH" || b.textContent.trim() === "Search");
-      if (btn) btn.click();
+      const b = btns.find(x => norm(x.textContent).toUpperCase() === "SEARCH");
+      if (b) b.click();
     });
-    await page.waitForTimeout(5000);
+    
+    // Wait for the result row to actually render
+    await page.waitForFunction(() =>
+      /###-\d+-\d+/.test(document.body.innerText),
+      { timeout: 20000 }
+    ).catch(() => {});
+    await page.waitForTimeout(2000);
     log("Search done");
+
 
         // Click Copy icon on the result row
     const copyIcon = await page.evaluate(() => {
