@@ -810,12 +810,13 @@ app.post("/duplicate-pnc", async (req, res) => {
     await clickSidebar("Prior Notice Overview");
     await page.waitForTimeout(4000);
 
-    const impOk = await page.evaluate(() => {
+        const impOk = await page.evaluate(() => {
       const norm = s => (s||"").replace(/\s+/g," ").trim();
       const all = Array.from(document.querySelectorAll("*"));
       const heading = all.find(e =>
         /IMPORTER DETAILS/i.test(norm(e.textContent)) &&
-        norm(e.textContent).length < 60 &&
+        !/SUBMITTER/i.test(norm(e.textContent)) &&
+        norm(e.textContent).length < 40 &&
         e.tagName !== "HTML" && e.tagName !== "BODY"
       );
       if (!heading) return "no heading";
@@ -827,6 +828,7 @@ app.post("/duplicate-pnc", async (req, res) => {
       }
       return "heading found no button";
     });
+
         log("Opened Importer Details: " + impOk);
     const whichForm = await page.evaluate(() => {
       const t = document.body.innerText;
