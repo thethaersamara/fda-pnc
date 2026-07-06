@@ -647,33 +647,33 @@ app.post("/duplicate-pnc", async (req, res) => {
       if (b) b.click();
     });
 
-    await page.waitForFunction(() =>
-      /###-\d+-\d+/.test(document.body.innerText),
+    await page.waitForFunction(
+      (id) => document.body.innerText.includes(id),
+      sourcePncId,
       { timeout: 20000 }
     ).catch(() => {});
-    await page.waitForTimeout(2000);
 
-    const searchState = await page.evaluate(() => {
+      const searchState = await page.evaluate((id) => {
       const rows = document.querySelectorAll("tr").length;
-      const hasRow = /###-\d+-\d+/.test(document.body.innerText);
+      const hasRow = document.body.innerText.includes(id);
       return "hasRow=" + hasRow + " rows=" + rows;
-    });
+    }, sourcePncId);
     log("Search state: " + searchState);
 
 
-        // Click Copy icon on the result row
-    const copyIcon = await page.evaluate(() => {
+
+           // Click Copy icon on the result row
+    const copyIcon = await page.evaluate((id) => {
       const rows = Array.from(document.querySelectorAll("tr"));
       for (const row of rows) {
-        if (!/###-\d/.test(row.textContent)) continue; // only the data row
+        if (!row.textContent.includes(id)) continue;
         const btns = Array.from(row.querySelectorAll("button, a"));
-        // find the one whose icon is the copy/content_copy glyph
         const copy = btns.find(b => /content_copy|copy|file_copy/i.test(b.innerHTML));
-        const target = copy || btns[1]; // fallback to 2nd
+        const target = copy || btns[1];
         if (target) { target.click(); return "clicked " + (copy ? "copy-icon" : "btns[1]") + " of " + btns.length; }
       }
       return "no data row / no buttons";
-    });
+    }, sourcePncId);
     log("Copy icon: " + copyIcon);
     await page.waitForTimeout(3000);
 
