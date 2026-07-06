@@ -804,7 +804,29 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.keyboard.type(dateStr, { delay: 100 });
     await page.keyboard.press("Enter");
     await page.waitForTimeout(500);
-    log("Tracking and date updated");
+
+       log("Tracking and date updated");
+
+    const backClicked = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll("a, span, div"));
+      const el = links.find(e => /Back to:\s*Edit Prior Notice/i.test(e.textContent) && e.textContent.replace(/\s+/g," ").trim().length < 40);
+      if (el) { (el.closest("a,button")||el).click(); return true; }
+      return false;
+    });
+    log("Back to overview clicked: " + backClicked);
+    await page.waitForFunction(() =>
+      /In Progress|Food Article Status/i.test(document.body.innerText),
+      { timeout: 20000 }
+    ).catch(() => {});
+    await page.waitForTimeout(3000);
+
+    const tableCheck = await page.evaluate(() => {
+      const rows = document.querySelectorAll("tr").length;
+      const inProg = (document.body.innerText.match(/In Progress/g)||[]).length;
+      return "rows=" + rows + " inProgress=" + inProg;
+    });
+    log("Table check: " + tableCheck);
+
     // Back to overview so the article table is visible
     await page.evaluate(() => {
       const links = Array.from(document.querySelectorAll("a, span, div"));
