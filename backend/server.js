@@ -810,7 +810,7 @@ app.post("/duplicate-pnc", async (req, res) => {
     await clickSidebar("Prior Notice Overview");
     await page.waitForTimeout(4000);
 
-      c    const impOk = await page.evaluate(() => {
+      const impOk = await page.evaluate(() => {
       const norm = s => (s||"").replace(/\s+/g," ").trim();
       // find the smallest element containing the importer's unique text
       const all = Array.from(document.querySelectorAll("*"));
