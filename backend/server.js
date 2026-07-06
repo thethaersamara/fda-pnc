@@ -21,6 +21,26 @@ async function safeFill(page, selector, value) {
   try { await page.fill(selector, String(value)); } catch {}
 }
 
+// Parse a 2-column sheet (tracking, pnc) in either order. Handles headers, commas or tabs.
+function parseDupCsv(csv) {
+  const lines = String(csv).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const rows = [];
+  for (const line of lines) {
+    const cells = line.split(/[,\t;]/).map(c => c.trim().replace(/^["']|["']$/g, ""));
+    if (cells.length < 2) continue;
+    // skip header row
+    if (/track|pnc|entry|number|id/i.test(cells[0]) && /track|pnc|entry|number|id/i.test(cells[1])) continue;
+    // PNC ids look like F##X######## ; tracking is usually all digits. Detect which column is which.
+    const isPnc = s => /^F\d{2}X\d+/i.test(s);
+    let sourcePncId, trackingNumber;
+    if (isPnc(cells[0])) { sourcePncId = cells[0]; trackingNumber = cells[1]; }
+    else if (isPnc(cells[1])) { sourcePncId = cells[1]; trackingNumber = cells[0]; }
+    else { trackingNumber = cells[0]; sourcePncId = cells[1]; } // fallback: assume tracking,pnc
+    if (sourcePncId && trackingNumber) rows.push({ sourcePncId, trackingNumber });
+  }
+  return rows;
+}
+
 async function createBrowser() {
   const response = await fetch("https://www.browserbase.com/v1/sessions", {
     method: "POST",
@@ -558,9 +578,19 @@ app.post("/parse-invoice",async (req, res) => {
   }
 });
 app.post("/duplicate-pnc", async (req, res) => {
-  const { sessionId, sourcePncId, trackingNumber } = req.body;
-  if (!sessionId || !sourcePncId || !trackingNumber)
-    return res.status(400).json({ error: "sessionId, sourcePncId, trackingNumber required" });
+  const { sessionId } = req.body;
+
+  // Accept: rows:[{sourcePncId,trackingNumber}], or csv string, or single sourcePncId+trackingNumber
+  let rows = req.body.rows;
+  if (!rows && typeof req.body.csv === "string") rows = parseDupCsv(req.body.csv);
+  if (!rows && req.body.sourcePncId && req.body.trackingNumber)
+    rows = [{ sourcePncId: req.body.sourcePncId, trackingNumber: req.body.trackingNumber }];
+
+  if (!sessionId || !Array.isArray(rows) || rows.length === 0)
+    return res.status(400).json({ error: "sessionId and rows[] (or csv, or sourcePncId+trackingNumber) required" });
+  for (const r of rows)
+    if (!r.sourcePncId || !r.trackingNumber)
+      return res.status(400).json({ error: "each row needs sourcePncId and trackingNumber" });
 
   const session = sessions[sessionId];
   if (!session) return res.status(404).json({ error: "Session not found" });
@@ -569,11 +599,12 @@ app.post("/duplicate-pnc", async (req, res) => {
   const { page } = session;
   const logs = [];
   const log = (msg) => { console.log("[DUP] " + msg); logs.push(msg); };
+  const results = [];
 
   // Respond immediately, process in background. Frontend polls /dup-status/:sessionId
   session.dupStatus = "processing";
-  session.dupResult = null;
-  res.json({ success: true, status: "processing", message: "PNC duplication started, poll /dup-status/" + sessionId });
+  session.dupResult = { total: rows.length, done: 0, results };
+  res.json({ success: true, status: "processing", total: rows.length, message: "poll /dup-status/" + sessionId });
 
   try {
     log("Navigating to PNSI...");
@@ -596,6 +627,12 @@ app.post("/duplicate-pnc", async (req, res) => {
       if (yes) yes.click();
     }).catch(() => {});
     await page.waitForTimeout(3000);
+
+    // ---- Loop over each PNC. The Submissions nav below is the reset between rows. ----
+    for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+      const { sourcePncId, trackingNumber } = rows[rowIdx];
+      log("=== PNC " + (rowIdx + 1) + "/" + rows.length + ": " + sourcePncId + " -> " + trackingNumber + " ===");
+      try {
 
                  log("Clicking Submissions tab...");
     await page.evaluate(() => {
@@ -915,15 +952,26 @@ app.post("/duplicate-pnc", async (req, res) => {
     log("PDF generated");
 
     const finalPage = await page.evaluate(() => document.body.innerText);
-    const confirmMatch = finalPage.match(/\d{12}/);
-    const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
-    log("Confirmation: " + confirmationNumber);
-    session.dupResult = { success: true, confirmationNumber, logs };
+    // Envelope Number looks like F26X29449877 — NOT the 12-digit FedEx tracking number.
+    const envMatch = finalPage.match(/F\d{2}X\d{6,}/i);
+    const envelopeNumber = envMatch ? envMatch[0] : (sourcePncId ? "submitted" : "Submitted - check PNSI");
+    log("Envelope Number: " + envelopeNumber);
+
+        results.push({ sourcePncId, trackingNumber, envelopeNumber, success: true });
+        session.dupResult.done = results.filter(r => r.success).length;
+
+      } catch (rowErr) {
+        log("ROW ERROR (" + sourcePncId + "): " + rowErr.message);
+        results.push({ sourcePncId, trackingNumber, success: false, error: rowErr.message });
+      }
+    } // end per-row loop
+
+    session.dupResult = { total: rows.length, done: results.filter(r => r.success).length, results, logs };
     session.dupStatus = "done";
 
   } catch (err) {
     log("ERROR: " + err.message);
-    session.dupResult = { success: false, error: err.message, logs };
+    session.dupResult = { total: rows.length, done: results.filter(r => r.success).length, results, error: err.message, logs };
     session.dupStatus = "error";
   }
 });
