@@ -2,6 +2,24 @@ import { useState, useRef, useCallback } from "react";
 
 const BACKEND = "/api";
 const SESSION_ID = Math.random().toString(36).slice(2);
+const MAX_DUP_ROWS = 20;
+
+// Parse a 2-column sheet (source PNC + new tracking) in either order. Skips a header row.
+function parseDupRows(text) {
+  const lines = String(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const rows = [];
+  for (const line of lines) {
+    const cells = line.split(/[,\t;]/).map((c) => c.trim().replace(/^["']|["']$/g, ""));
+    if (cells.length < 2) continue;
+    if (/track|pnc|entry|number|id/i.test(cells[0]) && /track|pnc|entry|number|id/i.test(cells[1])) continue;
+    let sourcePncId, trackingNumber;
+    if (/^F\d{2}X\d+/i.test(cells[0])) { sourcePncId = cells[0]; trackingNumber = cells[1]; }
+    else if (/^F\d{2}X\d+/i.test(cells[1])) { sourcePncId = cells[1]; trackingNumber = cells[0]; }
+    else { sourcePncId = cells[0]; trackingNumber = cells[1]; } // fallback: assume PNC,tracking
+    if (sourcePncId && trackingNumber) rows.push({ sourcePncId, trackingNumber });
+  }
+  return rows;
+}
 
 async function parseInvoiceWithClaude(fileBase64, mimeType) {
   const response = await fetch(`${BACKEND}/parse-invoice`, {
@@ -175,18 +193,11 @@ function InvoiceCard({ invoice, idx, onUpdate, onSubmit, onRemove, submitting, l
 export default function App() {
   const [activeTab, setActiveTab] = useState("upload");
   const [invoices, setInvoices] = useState([]);
-  const [dupRows, setDupRows] = useState([{
-    sourcePncId: "###-3729647-0",
-    trackingNumber: "873422586480",
-    importerName: "Agnes Almeida",
-    importerAddress: "2562 Wedglea Dr",
-    importerCity: "Dallas",
-    importerState: "Texas",
-    importerZip: "75211",
-    status: "idle",
-    confirmationNumber: "",
-    logs: []
-  }]);
+  const [dupCsvText, setDupCsvText] = useState("");
+  const [dupParsed, setDupParsed] = useState([]);
+  const [dupFileName, setDupFileName] = useState("");
+  const [dupError, setDupError] = useState("");
+  const [dupBatch, setDupBatch] = useState(null); // { status, result:{ total, done, results } }
   const [dragging, setDragging] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -201,6 +212,7 @@ export default function App() {
   const [loginError, setLoginError] = useState("");
 
   const fileRef = useRef();
+  const dupFileRef = useRef();
   const loggedIn = loginStatus === "logged_in";
 
   const toBase64 = (file) => new Promise((res, rej) => {
@@ -281,48 +293,49 @@ export default function App() {
     finally { setSubmitting(false); }
   }, [loggedIn]);
 
-    const submitDuplicate = async (row, idx) => {
+  const onDupFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setDupError(""); setDupBatch(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || "");
+      const parsed = parseDupRows(text);
+      if (parsed.length === 0) { setDupError("No valid rows. Need two columns: source PNC and new tracking number."); setDupParsed([]); return; }
+      if (parsed.length > MAX_DUP_ROWS) { setDupError(`File has ${parsed.length} rows. Max is ${MAX_DUP_ROWS}.`); setDupParsed([]); return; }
+      setDupCsvText(text); setDupParsed(parsed); setDupFileName(file.name);
+    };
+    reader.readAsText(file);
+  };
+
+  const runBatch = async () => {
     if (!loggedIn) { setShowCreds(true); return; }
-    setDupRows(prev => prev.map((r, i) => i === idx ? { ...r, status: "submitting", logs: [] } : r));
+    if (dupParsed.length === 0) { setDupError("Upload a CSV first."); return; }
+    setDupError("");
     setDupSubmitting(true);
+    setDupBatch({ status: "processing", result: { total: dupParsed.length, done: 0, results: [] } });
     try {
-      await fetch(`${BACKEND}/duplicate-pnc`, {
+      const res = await fetch(`${BACKEND}/duplicate-pnc`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: SESSION_ID,
-          sourcePncId: row.sourcePncId,
-          trackingNumber: row.trackingNumber,
-          importer: {
-            name: row.importerName,
-            address: row.importerAddress,
-            city: row.importerCity,
-            state: row.importerState,
-            zip: row.importerZip,
-          }
-        }),
+        body: JSON.stringify({ sessionId: SESSION_ID, csv: dupCsvText }),
       });
+      const data = await res.json();
+      if (!res.ok) { setDupError(data.error || "Request failed"); setDupSubmitting(false); return; }
 
-      // Poll for result every 10 seconds
       const poll = setInterval(async () => {
         try {
-          const res = await fetch(`${BACKEND}/duplicate-pnc-status/${SESSION_ID}`);
-          const data = await res.json();
-          if (data.status === "done") {
+          const r = await fetch(`${BACKEND}/dup-status/${SESSION_ID}`);
+          const s = await r.json();
+          setDupBatch(s);
+          if (s.status === "done" || s.status === "error") {
             clearInterval(poll);
-            setDupRows(prev => prev.map((r, i) => i === idx ? {
-              ...r,
-              status: data.success ? "success" : "error",
-              confirmationNumber: data.confirmationNumber || "",
-              logs: data.logs || []
-            } : r));
             setDupSubmitting(false);
           }
         } catch {}
-      }, 10000);
-
+      }, 4000);
     } catch (e) {
-      setDupRows(prev => prev.map((r, i) => i === idx ? { ...r, status: "error", logs: [e.message] } : r));
+      setDupError(`Connection error: ${e.message}`);
       setDupSubmitting(false);
     }
   };
@@ -430,61 +443,73 @@ export default function App() {
         {activeTab === "duplicate" && (
           <>
             <div style={S.card}>
-              <div style={S.sectionTitle}>PNC Duplicate</div>
+              <div style={S.sectionTitle}>PNC Duplicate — Batch</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e", marginBottom: 20 }}>
-                Copy an existing PNC with new tracking number and importer details.
+                Upload a CSV with two columns: source PNC to copy from, and the new tracking number. Up to {MAX_DUP_ROWS} at a time.
               </div>
-              <button onClick={() => setDupRows(prev => [...prev, { sourcePncId: "", trackingNumber: "", importerName: "", importerAddress: "", importerCity: "", importerState: "", importerZip: "", status: "idle", confirmationNumber: "", logs: [] }])} style={S.secondaryBtn}>
-                + Add Row
-              </button>
-            </div>
+              <div
+                style={S.dropzone(false)}
+                onClick={() => dupFileRef.current?.click()}
+              >
+                <input ref={dupFileRef} type="file" accept=".csv,text/csv,text/plain" style={{ display: "none" }} onChange={onDupFile} />
+                <div style={{ fontSize: 36, marginBottom: 12 }}>📑</div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15, color: "#6b5e4e", marginBottom: 6 }}>
+                  {dupFileName ? dupFileName : "Click to choose a CSV file"}
+                </div>
+                <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e" }}>
+                  Columns: PNC to copy · new tracking number
+                </div>
+              </div>
+              {dupError && <div style={{ marginTop: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#991b1b" }}>⚠ {dupError}</div>}
 
-            {dupRows.map((row, idx) => (
-              <div key={idx} style={S.card}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                  <div>
-                    <span style={{ fontSize: 16 }}>Shipment #{idx + 1}</span>
-                    {row.status === "success" && <span style={{ ...S.tag("green"), marginLeft: 10 }}>✓ Submitted</span>}
-                    {row.status === "error" && <span style={{ ...S.tag("red"), marginLeft: 10 }}>Failed</span>}
-                    {row.status === "submitting" && <span style={{ ...S.tag("gold"), marginLeft: 10 }}>Submitting…</span>}
-                    {row.confirmationNumber && (
-                      <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#166534", marginTop: 4 }}>
-                        PNC# <strong>{row.confirmationNumber}</strong>
+              {dupParsed.length > 0 && (
+                <div style={{ marginTop: 20 }}>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, color: "#6b5e4e", marginBottom: 10 }}>
+                    {dupParsed.length} row{dupParsed.length > 1 ? "s" : ""} ready
+                  </div>
+                  {dupParsed.map((r, i) => {
+                    const res = dupBatch?.result?.results?.find((x) => x.sourcePncId === r.sourcePncId);
+                    return (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #f0ece4", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>
+                        <span style={{ fontFamily: "monospace", fontSize: 12, color: "#1a1612" }}>{r.sourcePncId}</span>
+                        <span style={{ opacity: 0.4 }}>→</span>
+                        <span style={{ fontFamily: "monospace", fontSize: 12, color: "#6b5e4e", flex: 1 }}>{r.trackingNumber}</span>
+                        {res
+                          ? (res.success
+                              ? <span style={S.tag("green")}>✓ {res.envelopeNumber}</span>
+                              : <span style={S.tag("red")}>✕ {res.error?.slice(0, 30)}</span>)
+                          : (dupSubmitting ? <span style={S.tag("gold")}>…</span> : <span style={{ ...S.tag("gold"), opacity: 0.5 }}>Ready</span>)}
                       </div>
+                    );
+                  })}
+
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 20 }}>
+                    <button
+                      onClick={runBatch}
+                      disabled={dupSubmitting || !loggedIn}
+                      style={S.accentBtn(dupSubmitting || !loggedIn)}
+                    >
+                      {dupSubmitting
+                        ? `Running… ${dupBatch?.result?.done ?? 0}/${dupBatch?.result?.total ?? dupParsed.length}`
+                        : `Duplicate ${dupParsed.length} PNC${dupParsed.length === 1 ? "" : "s"}`}
+                    </button>
+                    {!loggedIn && <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#991b1b" }}>Log in to FDA first</span>}
+                    {dupBatch?.status === "done" && (
+                      <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, color: "#166534" }}>
+                        Finished · {dupBatch.result?.done}/{dupBatch.result?.total} submitted
+                      </span>
                     )}
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => submitDuplicate(row, idx)} disabled={dupSubmitting || !loggedIn || row.status === "success"} style={S.accentBtn(dupSubmitting || !loggedIn || row.status === "success")}>
-                      {row.status === "submitting" ? "Submitting…" : "Submit PNC"}
-                    </button>
-                    <button onClick={() => setDupRows(prev => prev.filter((_, i) => i !== idx))} style={{ ...S.secondaryBtn, color: "#991b1b", borderColor: "#fca5a5" }}>✕</button>
-                  </div>
                 </div>
+              )}
+            </div>
 
-                <div style={S.grid3}>
-                  <Field label="Source PNC ID" value={row.sourcePncId} onChange={(v) => setDupRows(prev => prev.map((r, i) => i === idx ? { ...r, sourcePncId: v } : r))} />
-                  <Field label="New Tracking Number" value={row.trackingNumber} onChange={(v) => setDupRows(prev => prev.map((r, i) => i === idx ? { ...r, trackingNumber: v } : r))} />
-                  <div />
-                </div>
-
-                <div style={{ marginTop: 16 }}>
-                  <div style={S.sectionTitle}>Importer Details</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <Field label="Importer Name" value={row.importerName} onChange={(v) => setDupRows(prev => prev.map((r, i) => i === idx ? { ...r, importerName: v } : r))} />
-                    <Field label="Street Address" value={row.importerAddress} onChange={(v) => setDupRows(prev => prev.map((r, i) => i === idx ? { ...r, importerAddress: v } : r))} />
-                    <div style={S.grid3}>
-                      <Field label="City" value={row.importerCity} onChange={(v) => setDupRows(prev => prev.map((r, i) => i === idx ? { ...r, importerCity: v } : r))} />
-                      <Field label="State" value={row.importerState} onChange={(v) => setDupRows(prev => prev.map((r, i) => i === idx ? { ...r, importerState: v } : r))} />
-                      <Field label="ZIP" value={row.importerZip} onChange={(v) => setDupRows(prev => prev.map((r, i) => i === idx ? { ...r, importerZip: v } : r))} />
-                    </div>
-                  </div>
-                </div>
-
-                {row.logs?.length > 0 && (
-                  <div style={S.logBox}>{row.logs.map((l, i) => <div key={i}>{l}</div>)}</div>
-                )}
+            {dupBatch?.result?.logs?.length > 0 && (
+              <div style={S.card}>
+                <div style={S.sectionTitle}>Run Log</div>
+                <div style={S.logBox}>{dupBatch.result.logs.map((l, i) => <div key={i}>{l}</div>)}</div>
               </div>
-            ))}
+            )}
           </>
         )}
       </div>
