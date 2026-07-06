@@ -810,9 +810,16 @@ app.post("/duplicate-pnc", async (req, res) => {
     log("Tracking and date updated");
 
     const backClicked = await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll("a, span, div"));
-      const el = links.find(e => /Back to:\s*Edit Prior Notice/i.test(e.textContent) && e.textContent.replace(/\s+/g," ").trim().length < 40);
-      if (el) { (el.closest("a,button")||el).click(); return true; }
+      const norm = s => (s || "").replace(/\s+/g, " ").trim();
+      // Prefer the anchor itself; shortest matching anchor avoids big containers.
+      const anchors = Array.from(document.querySelectorAll("a, button"))
+        .filter(e => /Back to:\s*Edit Prior Notice/i.test(norm(e.textContent)))
+        .sort((a, b) => norm(a.textContent).length - norm(b.textContent).length);
+      if (anchors[0]) { anchors[0].click(); return true; }
+      // Fallback: leaf node with the text, click its closest anchor.
+      const leaf = Array.from(document.querySelectorAll("*"))
+        .find(e => e.children.length === 0 && /Back to:\s*Edit Prior Notice/i.test(norm(e.textContent)));
+      if (leaf) { (leaf.closest("a, button") || leaf).click(); return true; }
       return false;
     });
     log("Back to overview clicked: " + backClicked);
