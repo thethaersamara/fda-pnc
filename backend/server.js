@@ -805,6 +805,17 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.keyboard.press("Enter");
     await page.waitForTimeout(500);
     log("Tracking and date updated");
+    // Back to overview so the article table is visible
+    await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll("a, span, div"));
+      const el = links.find(e => /Back to:\s*Edit Prior Notice/i.test(e.textContent) && e.textContent.replace(/\s+/g," ").trim().length < 40);
+      if (el) (el.closest("a,button")||el).click();
+    });
+    await page.waitForFunction(() =>
+      /In Progress|Food Article Status/i.test(document.body.innerText),
+      { timeout: 20000 }
+    ).catch(() => {});
+    await page.waitForTimeout(3000);
 
     log("Processing food articles...");
     let articlesDone = false;
@@ -829,7 +840,6 @@ app.post("/duplicate-pnc", async (req, res) => {
       articleCount++;
       log("Processing article " + articleCount + "...");
       await page.waitForTimeout(5000);
-
       // Click Review in sidebar
       await page.evaluate(() => {
         const all = Array.from(document.querySelectorAll("*"));
@@ -859,7 +869,7 @@ app.post("/duplicate-pnc", async (req, res) => {
       }, { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(1000);
 
-      // Always click "No, Done" — returns to overview, loop re-scans
+      // Click "No, Done" — returns to overview, loop re-scans
       await page.evaluate(() => {
         const btns = Array.from(document.querySelectorAll("button"));
         const btn = btns.find(b => b.textContent.includes("No, Done creating Food Articles"));
