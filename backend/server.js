@@ -827,8 +827,8 @@ app.post("/duplicate-pnc", async (req, res) => {
       }
       return "heading found no button";
     });
-    log("Opened Importer Details: " + impOk);
-        const whichForm = await page.evaluate(() => {
+        log("Opened Importer Details: " + impOk);
+    const whichForm = await page.evaluate(() => {
       const t = document.body.innerText;
       if (/ARE YOU THE IMPORTER/i.test(t)) return "IMPORTER form";
       if (/ARE YOU THE SUBMITTER|SUBMITTER INFORMATION/i.test(t)) return "SUBMITTER form";
@@ -836,6 +836,12 @@ app.post("/duplicate-pnc", async (req, res) => {
     });
     log("Landed on: " + whichForm);
     await page.waitForTimeout(4000);
+    const who = await page.evaluate(() => {
+      const fn = (document.getElementById("firstNameTxt")||{}).value || "";
+      const ln = (document.getElementById("lastNameTxt")||{}).value || "";
+      return fn + " " + ln;
+    });
+    log("Form currently shows person: " + who)
 
            // Fill importer fields by exact ID
     async function setField(id, value) {
