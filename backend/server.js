@@ -809,16 +809,28 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(500);
     log("Tracking and date updated");
 
+    // Show what's actually on screen at this moment (the earlier text may be stale)
+    const preBack = await page.evaluate(() => {
+      const norm = s => (s || "").replace(/\s+/g, " ").trim();
+      const backish = Array.from(document.querySelectorAll("a, button, span, div, li"))
+        .filter(e => /back to/i.test(norm(e.textContent)) && norm(e.textContent).length < 60)
+        .map(e => "<" + e.tagName + ">" + norm(e.textContent).slice(0, 50));
+      return "title=" + norm(document.title) +
+        " | h1=" + norm((document.querySelector("h1") || {}).textContent || "") +
+        " | backLinks=" + JSON.stringify([...new Set(backish)].slice(0, 8));
+    });
+    log("Pre-back state: " + preBack);
+
     const backClicked = await page.evaluate(() => {
       const norm = s => (s || "").replace(/\s+/g, " ").trim();
       const all = Array.from(document.querySelectorAll("a, button, span, div, li"));
-      const matches = all.filter(e => /Back to:\s*Edit Prior Notice/i.test(norm(e.textContent)));
+      let matches = all.filter(e => /Back to:\s*Edit Prior Notice/i.test(norm(e.textContent)));
+      // looser fallback: any short "Back to ..." control
+      if (!matches.length) matches = all.filter(e => /back to/i.test(norm(e.textContent)) && norm(e.textContent).length < 60);
       if (!matches.length) return "NO MATCH";
-      // tightest wrapper around the link text
       matches.sort((a, b) => norm(a.textContent).length - norm(b.textContent).length);
       const el = matches[0];
       (el.closest("a, button") || el).click();
-      // return the outerHTML of the smallest match so we can see what it actually is
       return "clicked <" + el.tagName + "> " + (el.outerHTML || "").replace(/\s+/g, " ").slice(0, 300);
     });
     log("Back to overview clicked: " + backClicked);
