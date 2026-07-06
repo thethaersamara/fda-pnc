@@ -805,7 +805,10 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.keyboard.press("Enter");
     await page.waitForTimeout(500);
 
-       log("Tracking and date updated");
+        await page.keyboard.type(dateStr, { delay: 100 });
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(500);
+    log("Tracking and date updated");
 
     const backClicked = await page.evaluate(() => {
       const links = Array.from(document.querySelectorAll("a, span, div"));
@@ -827,23 +830,10 @@ app.post("/duplicate-pnc", async (req, res) => {
     });
     log("Table check: " + tableCheck);
 
-    // Back to overview so the article table is visible
-    await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll("a, span, div"));
-      const el = links.find(e => /Back to:\s*Edit Prior Notice/i.test(e.textContent) && e.textContent.replace(/\s+/g," ").trim().length < 40);
-      if (el) (el.closest("a,button")||el).click();
-    });
-    await page.waitForFunction(() =>
-      /In Progress|Food Article Status/i.test(document.body.innerText),
-      { timeout: 20000 }
-    ).catch(() => {});
-    await page.waitForTimeout(3000);
-
     log("Processing food articles...");
     let articlesDone = false;
     let articleCount = 0;
-
-
+    
        while (!articlesDone) {
       await page.waitForTimeout(4000);
 
