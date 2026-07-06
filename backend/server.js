@@ -810,23 +810,24 @@ app.post("/duplicate-pnc", async (req, res) => {
     await clickSidebar("Prior Notice Overview");
     await page.waitForTimeout(4000);
 
-      const impOk = await page.evaluate(() => {
+      c    const impOk = await page.evaluate(() => {
       const norm = s => (s||"").replace(/\s+/g," ").trim();
+      // find the smallest element containing the importer's unique text
       const all = Array.from(document.querySelectorAll("*"));
-      const heading = all.find(e =>
-        /IMPORTER DETAILS/i.test(norm(e.textContent)) &&
-        !/SUBMITTER/i.test(norm(e.textContent)) &&
-        norm(e.textContent).length < 40 &&
+      const marker = all.find(e =>
+        /Oceanside|Aida Williams|4679 Cyrus/i.test(norm(e.textContent)) &&
+        norm(e.textContent).length < 200 &&
         e.tagName !== "HTML" && e.tagName !== "BODY"
       );
-      if (!heading) return "no heading";
-      let node = heading;
-      for (let i = 0; i < 6 && node; i++) {
+      if (!marker) return "no marker";
+      // walk up looking for a container that has a button (the pencil)
+      let node = marker;
+      for (let i = 0; i < 8 && node; i++) {
         const btn = node.querySelector && node.querySelector("button");
         if (btn) { btn.click(); return "clicked L" + i; }
         node = node.parentElement;
       }
-      return "heading found no button";
+      return "marker found no button";
     });
 
     log("Opened Importer Details: " + impOk);
