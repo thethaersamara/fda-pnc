@@ -810,26 +810,23 @@ app.post("/duplicate-pnc", async (req, res) => {
     await clickSidebar("Prior Notice Overview");
     await page.waitForTimeout(4000);
 
-        const impOk = await page.evaluate(() => {
+                const impOk = await page.evaluate(() => {
       const norm = s => (s||"").replace(/\s+/g," ").trim();
-      const all = Array.from(document.querySelectorAll("*"));
-      const heading = all.find(e =>
-        /IMPORTER DETAILS/i.test(norm(e.textContent)) &&
-        !/SUBMITTER/i.test(norm(e.textContent)) &&
-        norm(e.textContent).length < 40 &&
-        e.tagName !== "HTML" && e.tagName !== "BODY"
-      );
-      if (!heading) return "no heading";
-      let node = heading;
-      for (let i = 0; i < 6 && node; i++) {
-        const btn = node.querySelector && node.querySelector("button");
-        if (btn) { btn.click(); return "clicked L" + i; }
-        node = node.parentElement;
-      }
-      return "heading found no button";
+      // find the element/card that contains the importer's name "Aida Williams" (current importer)
+      const all = Array.from(document.querySelectorAll("div, section, mat-card, td"));
+      // the importer card: contains "Importer" label and a person name, but NOT "Submitter"
+      const card = all.find(e => {
+        const t = norm(e.textContent);
+        return /Importer/i.test(t) && /Aida Williams/i.test(t) && !/Submitter/i.test(t) && t.length < 200;
+      });
+      if (!card) return "no importer card";
+      const btn = card.querySelector("button") ||
+                  (card.closest("div,section,mat-card") && card.closest("div,section,mat-card").querySelector("button"));
+      if (btn) { btn.click(); return "clicked importer card btn"; }
+      return "card found no button";
     });
-
-        log("Opened Importer Details: " + impOk);
+    log("Opened Importer Details: " + impOk);
+    
     const whichForm = await page.evaluate(() => {
       const t = document.body.innerText;
       if (/ARE YOU THE IMPORTER/i.test(t)) return "IMPORTER form";
