@@ -707,7 +707,7 @@ app.post("/duplicate-pnc", async (req, res) => {
     });
     log("Checkboxes found: " + allChecked);
     await page.waitForTimeout(1500);
-;
+
 
         // Click COPY WITH SELECTED FOOD ARTICLES
     log("Copying with selected food articles...");
@@ -806,127 +806,14 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.waitForTimeout(500);
     log("Tracking and date updated");
 
-        // Save tracking by going to overview, then open Importer via its pencil
-    await clickSidebar("Prior Notice Overview");
-    await page.waitForTimeout(4000);
-
-         const impOk = await page.evaluate(() => {
-      // the overview has 3 edit pencils: Mode, Submitter, Importer (in DOM order)
-      const btns = Array.from(document.querySelectorAll("button"));
-      const pencils = btns.filter(b => {
-        const icon = b.querySelector("mat-icon");
-        return icon && /edit|create|mode_edit/i.test(icon.textContent);
-      });
-      if (pencils.length === 0) return "no pencils";
-      pencils[pencils.length - 1].click();  // last = importer
-      return "clicked last of " + pencils.length + " pencils";
-    });
-
-
-    log("Opened Importer Details: " + impOk);
-    
-    const whichForm = await page.evaluate(() => {
-      const t = document.body.innerText;
-      if (/ARE YOU THE IMPORTER/i.test(t)) return "IMPORTER form";
-      if (/ARE YOU THE SUBMITTER|SUBMITTER INFORMATION/i.test(t)) return "SUBMITTER form";
-      return "other: " + t.slice(0,60);
-    });
-    log("Landed on: " + whichForm);
-    await page.waitForTimeout(4000);
-    const who = await page.evaluate(() => {
-      const fn = (document.getElementById("firstNameTxt")||{}).value || "";
-      const ln = (document.getElementById("lastNameTxt")||{}).value || "";
-      return fn + " " + ln;
-    });
-    log("Form currently shows person: " + who)
-
-           // Fill importer fields by exact ID
-    async function setField(id, value) {
-      const ok = await page.evaluate((fid) => {
-        const el = document.getElementById(fid);
-        if (!el) return false;
-        el.focus(); el.click();
-        return true;
-      }, id);
-      if (ok) {
-        await page.keyboard.press("Control+A");
-        await page.keyboard.press("Backspace");
-        await page.keyboard.type(value, { delay: 60 });
-        await page.waitForTimeout(200);
-      }
-      return ok;
-    }
-
-    const nameOk = await setField("businessNameTxt", importer.name);
-    const addrOk = await setField("streetAddress", importer.address);
-    const cityOk = await setField("city", importer.city);
-    const zipOk  = await setField("zipTxt", importer.zip);
-    log("Importer fills: name=" + nameOk + " addr=" + addrOk + " city=" + cityOk + " zip=" + zipOk);
-
-    // State dropdown (importer uses countrySubDivision, not 'state')
-    await page.evaluate((state) => {
-      const sel = document.getElementById("countrySubDivision");
-      if (sel) {
-        const opt = Array.from(sel.options).find(o => o.text.includes(state));
-        if (opt) {
-          sel.value = opt.value;
-          ["input","change","blur"].forEach(ev => sel.dispatchEvent(new Event(ev,{bubbles:true})));
-        }
-      }
-    }, importer.state);
-    await page.waitForTimeout(500);
-    const dump = await page.evaluate(() => ({
-      businessName: (document.getElementById("businessNameTxt")||{}).value,
-      firstName: (document.getElementById("firstNameTxt")||{}).value,
-      lastName: (document.getElementById("lastNameTxt")||{}).value,
-      street: (document.getElementById("streetAddress")||{}).value,
-      city: (document.getElementById("city")||{}).value,
-      heading: (document.querySelector("h1,h2")||{}).textContent
-    }));
-    log("Form dump: " + JSON.stringify(dump));
-
-   // Importer form needs an explicit save, not just nav
-    const savedImp = await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const b = btns.find(x => /SAVE\s*&\s*CONTINUE/i.test(x.textContent));
-      if (b) { b.click(); return true; }
-      return false;
-    });
-    log("Importer saved via S&C: " + savedImp);
-    await page.waitForTimeout(4000);
-
-        // then go to overview
-        await page.waitForTimeout(4000);
-    const backOk = await page.evaluate(() => /FOOD ARTICLES|Food Article Count/i.test(document.body.innerText));
-    log("Back to overview: " + backOk);
-
-            await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll("button, a"));
-      const b = btns.find(x => x.textContent.replace(/\s+/g," ").trim() === "Continue");
-      if (b) b.click();
-    });
-    await page.waitForTimeout(5000);
-    const probe2 = await page.evaluate(() => ({
-      rows: document.querySelectorAll("tr").length,
-      hasArticles: /Tahini|Chili|Olive|Pickled|In Progress/i.test(document.body.innerText),
-      title: (document.querySelector("h1,h2")||{}).textContent || "none"
-    }));
-    log("After Continue: " + JSON.stringify(probe2));
-    await page.waitForFunction(() =>
-      document.querySelectorAll("tr").length > 1,
-      { timeout: 20000 }
-    ).catch(() => {});
-    await page.waitForTimeout(3000);
-    const fullText = await page.evaluate(() => document.body.innerText.replace(/\s+/g," ").slice(0, 600));
-    log("Page text: " + fullText);
-
     log("Processing food articles...");
     let articlesDone = false;
     let articleCount = 0;
 
 
-    while (!articlesDone) {
-      // Find next In Progress article pencil
+       while (!articlesDone) {
+      await page.waitForTimeout(4000);
+
       const foundArticle = await page.evaluate(() => {
         const rows = Array.from(document.querySelectorAll("tr"));
         for (const row of rows) {
@@ -943,92 +830,6 @@ app.post("/duplicate-pnc", async (req, res) => {
       log("Processing article " + articleCount + "...");
       await page.waitForTimeout(5000);
 
-            // Click Ultimate Consignee in sidebar
-      const ucClick = await page.evaluate(() => {
-        const all = Array.from(document.querySelectorAll("*"));
-        const el = all.find(e =>
-          e.children.length === 0 &&
-          e.textContent.trim() === "Ultimate Consignee" &&
-          e.tagName !== "SCRIPT"
-        );
-        if (el) { const p = el.closest("a, button, li") || el; p.click(); return true; }
-        return false;
-      });
-      await page.waitForTimeout(3000);
-
-      const ucDump = await page.evaluate(() => {
-        const inputs = Array.from(document.querySelectorAll("input, select, textarea"));
-        return inputs.map((i, n) => n + ":" + i.tagName + "[" + (i.type||"") + "] id=" + (i.id||"") + " name=" + (i.name||"")).slice(0, 40);
-      });
-      log("UC click: " + ucClick + " | UC fields: " + JSON.stringify(ucDump));
-
-
-      // Fill ultimate consignee - same importer info
-      // Name
-      await page.evaluate(() => {
-        const inputs = Array.from(document.querySelectorAll("input"));
-        const field = inputs.find(i => i.id && i.id.toLowerCase().includes("name") ||
-          i.placeholder && i.placeholder.toLowerCase().includes("name"));
-        if (field) { field.focus(); field.click(); }
-      });
-      await page.keyboard.press("Control+A");
-      await page.keyboard.press("Backspace");
-      await page.keyboard.type(importer.name, { delay: 100 });
-      await page.waitForTimeout(300);
-
-      // Address
-      await page.evaluate(() => {
-        const inputs = Array.from(document.querySelectorAll("input, textarea"));
-        const field = inputs.find(i => i.id && i.id.toLowerCase().includes("address") ||
-          i.placeholder && i.placeholder.toLowerCase().includes("address"));
-        if (field) { field.focus(); field.click(); }
-      });
-      await page.keyboard.press("Control+A");
-      await page.keyboard.press("Backspace");
-      await page.keyboard.type(importer.address, { delay: 100 });
-      await page.waitForTimeout(300);
-
-      // City
-      await page.evaluate(() => {
-        const inputs = Array.from(document.querySelectorAll("input"));
-        const field = inputs.find(i => i.id && i.id.toLowerCase().includes("city") ||
-          i.placeholder && i.placeholder.toLowerCase().includes("city"));
-        if (field) { field.focus(); field.click(); }
-      });
-      await page.keyboard.press("Control+A");
-      await page.keyboard.press("Backspace");
-      await page.keyboard.type(importer.city, { delay: 100 });
-      await page.waitForTimeout(300);
-
-      // State
-      await page.locator("select[name='state'], select[id*='state']").selectOption({ label: importer.state }).catch(async () => {
-        await page.evaluate((state) => {
-          const sels = Array.from(document.querySelectorAll("select"));
-          for (const sel of sels) {
-            const opt = Array.from(sel.options).find(o => o.text.includes(state));
-            if (opt) {
-              sel.value = opt.value;
-              ["input", "change", "blur"].forEach(ev =>
-                sel.dispatchEvent(new Event(ev, { bubbles: true }))
-              );
-            }
-          }
-        }, importer.state);
-      });
-      await page.waitForTimeout(500);
-
-      // Zip
-      await page.evaluate(() => {
-        const inputs = Array.from(document.querySelectorAll("input"));
-        const field = inputs.find(i => i.id && i.id.toLowerCase().includes("zip") ||
-          i.placeholder && i.placeholder.toLowerCase().includes("zip"));
-        if (field) { field.focus(); field.click(); }
-      });
-      await page.keyboard.press("Control+A");
-      await page.keyboard.press("Backspace");
-      await page.keyboard.type(importer.zip, { delay: 100 });
-      await page.waitForTimeout(300);
-
       // Click Review in sidebar
       await page.evaluate(() => {
         const all = Array.from(document.querySelectorAll("*"));
@@ -1041,14 +842,14 @@ app.post("/duplicate-pnc", async (req, res) => {
       });
       await page.waitForTimeout(5000);
 
-      // Click ADD THIS ARTICLE TO MY PRIOR NOTICE SUBMISSION
+      // Add this article to the submission
       await page.evaluate(() => {
         const btns = Array.from(document.querySelectorAll("button, a"));
         const btn = btns.find(b => b.textContent.toLowerCase().includes("add this article to my prior"));
         if (btn) { btn.scrollIntoView(); btn.click(); }
       });
 
-      // Wait for popup
+      // Wait for the confirmation popup
       await page.waitForFunction(() => {
         const btns = Array.from(document.querySelectorAll("button"));
         return btns.some(b =>
@@ -1058,29 +859,13 @@ app.post("/duplicate-pnc", async (req, res) => {
       }, { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(1000);
 
-      // Check if more articles exist - if yes click Yes, else No
-      const pageText = await page.evaluate(() => document.body.innerText);
-      const hasMoreInProgress = await page.evaluate(() => {
-        const rows = Array.from(document.querySelectorAll("tr"));
-        return rows.some(r => r.textContent.includes("In Progress"));
+      // Always click "No, Done" — returns to overview, loop re-scans
+      await page.evaluate(() => {
+        const btns = Array.from(document.querySelectorAll("button"));
+        const btn = btns.find(b => b.textContent.includes("No, Done creating Food Articles"));
+        if (btn) btn.click();
       });
-
-      if (hasMoreInProgress) {
-        await page.evaluate(() => {
-          const btns = Array.from(document.querySelectorAll("button"));
-          const btn = btns.find(b => b.textContent.includes("No, Done creating Food Articles"));
-          if (btn) btn.click();
-        });
-        await page.waitForTimeout(3000);
-      } else {
-        await page.evaluate(() => {
-          const btns = Array.from(document.querySelectorAll("button"));
-          const btn = btns.find(b => b.textContent.includes("No, Done creating Food Articles"));
-          if (btn) btn.click();
-        });
-        await page.waitForTimeout(3000);
-        articlesDone = true;
-      }
+      await page.waitForTimeout(5000);
     }
 
     log("All " + articleCount + " articles processed");
