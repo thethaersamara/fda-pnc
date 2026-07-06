@@ -5,8 +5,9 @@ const { chromium } = require("playwright-core");
 
 const app = express(); 
 const PORT = process.env.PORT || 3001;
-const BB_KEY = process.env.BROWSERBASE_API_KEY || "bb_live_ObfYaIPxJbYfxQ_e1IMbsmwuluE";
-const BB_PROJECT = process.env.BROWSERBASE_PROJECT_ID || "529bb6fc-5478-4648-b83c-e9eb4531a1fb";
+const BB_KEY = process.env.BROWSERBASE_API_KEY;
+const BB_PROJECT = process.env.BROWSERBASE_PROJECT_ID;
+if (!BB_KEY || !BB_PROJECT) console.warn("WARNING: BROWSERBASE_API_KEY / BROWSERBASE_PROJECT_ID not set");
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -492,8 +493,6 @@ app.post("/submit-pnc", async (req, res) => {
     log("Waited for Submitted to FDA status");
     await page.waitForTimeout(2000);
 
-        log("PDF generated");
-
     const finalPage = await page.evaluate(() => document.body.innerText);
     const confirmMatch = finalPage.match(/\d{12}/);
     const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
@@ -543,12 +542,14 @@ app.post("/parse-invoice",async (req, res) => {
     const data = await response.json();
     console.log("Claude response:", JSON.stringify(data).substring(0, 500));
 
-    if (!data.content || !data.content[0]) {
-      return res.status(500).json({ success: false, error: "Claude returned no content: " + JSON.stringify(data) });
+    const textBlock = Array.isArray(data.content)
+      ? data.content.find(b => b.type === "text")
+      : null;
+    if (!textBlock || !textBlock.text) {
+      return res.status(500).json({ success: false, error: "Claude returned no text content: " + JSON.stringify(data).slice(0, 500) });
     }
 
-    const text = data.content[0].text;
-    const clean = text.replace(/```json|```/g, "").trim();
+    const clean = textBlock.text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
     res.json({ success: true, invoice: parsed });
 
@@ -557,9 +558,9 @@ app.post("/parse-invoice",async (req, res) => {
   }
 });
 app.post("/duplicate-pnc", async (req, res) => {
-  const { sessionId, sourcePncId, trackingNumber, importer } = req.body;
-  if (!sessionId || !sourcePncId || !trackingNumber || !importer)
-    return res.status(400).json({ error: "Missing required fields" });
+  const { sessionId, sourcePncId, trackingNumber } = req.body;
+  if (!sessionId || !sourcePncId || !trackingNumber)
+    return res.status(400).json({ error: "sessionId, sourcePncId, trackingNumber required" });
 
   const session = sessions[sessionId];
   if (!session) return res.status(404).json({ error: "Session not found" });
@@ -569,8 +570,10 @@ app.post("/duplicate-pnc", async (req, res) => {
   const logs = [];
   const log = (msg) => { console.log("[DUP] " + msg); logs.push(msg); };
 
-  // Respond immediately, process in background
-  res.json({ success: true, status: "processing", message: "PNC duplication started, check logs" });
+  // Respond immediately, process in background. Frontend polls /dup-status/:sessionId
+  session.dupStatus = "processing";
+  session.dupResult = null;
+  res.json({ success: true, status: "processing", message: "PNC duplication started, poll /dup-status/" + sessionId });
 
   try {
     log("Navigating to PNSI...");
@@ -804,10 +807,6 @@ app.post("/duplicate-pnc", async (req, res) => {
     await page.keyboard.type(dateStr, { delay: 100 });
     await page.keyboard.press("Enter");
     await page.waitForTimeout(500);
-
-        await page.keyboard.type(dateStr, { delay: 100 });
-    await page.keyboard.press("Enter");
-    await page.waitForTimeout(500);
     log("Tracking and date updated");
 
     const backClicked = await page.evaluate(() => {
@@ -922,15 +921,31 @@ app.post("/duplicate-pnc", async (req, res) => {
     const confirmMatch = finalPage.match(/\d{12}/);
     const confirmationNumber = confirmMatch ? confirmMatch[0] : "Submitted - check PNSI";
     log("Confirmation: " + confirmationNumber);
-
-    log("Confirmation: " + confirmationNumber);
     session.dupResult = { success: true, confirmationNumber, logs };
+    session.dupStatus = "done";
 
   } catch (err) {
     log("ERROR: " + err.message);
     session.dupResult = { success: false, error: err.message, logs };
+    session.dupStatus = "error";
   }
 });
 
+app.get("/dup-status/:sessionId", (req, res) => {
+  const session = sessions[req.params.sessionId];
+  if (!session) return res.status(404).json({ error: "Session not found" });
+  res.json({ status: session.dupStatus || "unknown", result: session.dupResult || null });
+});
+
+
+app.post("/logout", async (req, res) => {
+  const { sessionId } = req.body;
+  const session = sessions[sessionId];
+  if (session && session.browser) {
+    try { await session.browser.close(); } catch {}
+  }
+  delete sessions[sessionId];
+  res.json({ success: true });
+});
 
 app.listen(PORT, () => console.log("Server running on port " + PORT));
