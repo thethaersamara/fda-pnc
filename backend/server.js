@@ -810,25 +810,18 @@ app.post("/duplicate-pnc", async (req, res) => {
     await clickSidebar("Prior Notice Overview");
     await page.waitForTimeout(4000);
 
-      const impOk = await page.evaluate(() => {
-      const norm = s => (s||"").replace(/\s+/g," ").trim();
-      // find the smallest element containing the importer's unique text
-      const all = Array.from(document.querySelectorAll("*"));
-      const marker = all.find(e =>
-        /Oceanside|Aida Williams|4679 Cyrus/i.test(norm(e.textContent)) &&
-        norm(e.textContent).length < 200 &&
-        e.tagName !== "HTML" && e.tagName !== "BODY"
-      );
-      if (!marker) return "no marker";
-      // walk up looking for a container that has a button (the pencil)
-      let node = marker;
-      for (let i = 0; i < 8 && node; i++) {
-        const btn = node.querySelector && node.querySelector("button");
-        if (btn) { btn.click(); return "clicked L" + i; }
-        node = node.parentElement;
-      }
-      return "marker found no button";
+         const impOk = await page.evaluate(() => {
+      // the overview has 3 edit pencils: Mode, Submitter, Importer (in DOM order)
+      const btns = Array.from(document.querySelectorAll("button"));
+      const pencils = btns.filter(b => {
+        const icon = b.querySelector("mat-icon");
+        return icon && /edit|create|mode_edit/i.test(icon.textContent);
+      });
+      if (pencils.length === 0) return "no pencils";
+      pencils[pencils.length - 1].click();  // last = importer
+      return "clicked last of " + pencils.length + " pencils";
     });
+
 
     log("Opened Importer Details: " + impOk);
     
