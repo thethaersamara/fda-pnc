@@ -811,16 +811,15 @@ app.post("/duplicate-pnc", async (req, res) => {
 
     const backClicked = await page.evaluate(() => {
       const norm = s => (s || "").replace(/\s+/g, " ").trim();
-      // Prefer the anchor itself; shortest matching anchor avoids big containers.
-      const anchors = Array.from(document.querySelectorAll("a, button"))
-        .filter(e => /Back to:\s*Edit Prior Notice/i.test(norm(e.textContent)))
-        .sort((a, b) => norm(a.textContent).length - norm(b.textContent).length);
-      if (anchors[0]) { anchors[0].click(); return true; }
-      // Fallback: leaf node with the text, click its closest anchor.
-      const leaf = Array.from(document.querySelectorAll("*"))
-        .find(e => e.children.length === 0 && /Back to:\s*Edit Prior Notice/i.test(norm(e.textContent)));
-      if (leaf) { (leaf.closest("a, button") || leaf).click(); return true; }
-      return false;
+      const all = Array.from(document.querySelectorAll("a, button, span, div, li"));
+      const matches = all.filter(e => /Back to:\s*Edit Prior Notice/i.test(norm(e.textContent)));
+      if (!matches.length) return "NO MATCH";
+      // tightest wrapper around the link text
+      matches.sort((a, b) => norm(a.textContent).length - norm(b.textContent).length);
+      const el = matches[0];
+      (el.closest("a, button") || el).click();
+      // return the outerHTML of the smallest match so we can see what it actually is
+      return "clicked <" + el.tagName + "> " + (el.outerHTML || "").replace(/\s+/g, " ").slice(0, 300);
     });
     log("Back to overview clicked: " + backClicked);
     await page.waitForFunction(() =>
