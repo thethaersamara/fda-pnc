@@ -45,7 +45,11 @@ async function createBrowser() {
   const response = await fetch("https://www.browserbase.com/v1/sessions", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-bb-api-key": BB_KEY },
-    body: JSON.stringify({ projectId: BB_PROJECT }),
+    body: JSON.stringify({
+      projectId: BB_PROJECT,
+      timeout: 3600,     // session max duration in seconds (Browserbase clamps to your plan's max)
+      keepAlive: true,   // don't close the session between/within requests
+    }),
   });
   const bbSession = await response.json();
   console.log("Browserbase session created:", bbSession.id);
