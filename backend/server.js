@@ -16,27 +16,103 @@ app.options("*", cors());
 
 const sessions = {};
 
+// ---- History store (tracking number -> customer -> PNC envelope) ----
+// Durable when DATABASE_URL is set and `pg` is installed. Otherwise in-memory (lost on restart).
+let pgPool = null;
+try {
+  if (process.env.DATABASE_URL) {
+    const { Pool } = require("pg");
+    pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+    pgPool.query(`CREATE TABLE IF NOT EXISTS pnc_history (
+      id SERIAL PRIMARY KEY,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      tracking_number TEXT,
+      customer_name TEXT,
+      envelope_number TEXT,
+      source_pnc_id TEXT
+    )`).then(() => console.log("pnc_history table ready"))
+      .catch(e => console.error("DB init error:", e.message));
+  } else {
+    console.warn("DATABASE_URL not set — history is in-memory only and will reset on restart.");
+  }
+} catch (e) {
+  console.warn("pg not installed — history is in-memory only:", e.message);
+}
+const memHistory = [];
+
+async function saveHistory(rec) {
+  const row = {
+    trackingNumber: rec.trackingNumber || "",
+    customerName: rec.customerName || "",
+    envelopeNumber: rec.envelopeNumber || "",
+    sourcePncId: rec.sourcePncId || "",
+  };
+  if (pgPool) {
+    try {
+      await pgPool.query(
+        "INSERT INTO pnc_history (tracking_number, customer_name, envelope_number, source_pnc_id) VALUES ($1,$2,$3,$4)",
+        [row.trackingNumber, row.customerName, row.envelopeNumber, row.sourcePncId]
+      );
+      return;
+    } catch (e) { console.error("saveHistory DB error:", e.message); }
+  }
+  memHistory.unshift({ ...row, createdAt: new Date().toISOString() });
+}
+
+async function getHistory(q) {
+  if (pgPool) {
+    try {
+      const sql = q
+        ? { text: "SELECT * FROM pnc_history WHERE tracking_number ILIKE $1 OR customer_name ILIKE $1 OR envelope_number ILIKE $1 ORDER BY created_at DESC LIMIT 500", values: ["%" + q + "%"] }
+        : { text: "SELECT * FROM pnc_history ORDER BY created_at DESC LIMIT 500", values: [] };
+      const r = await pgPool.query(sql);
+      return r.rows.map(x => ({
+        trackingNumber: x.tracking_number, customerName: x.customer_name,
+        envelopeNumber: x.envelope_number, sourcePncId: x.source_pnc_id, createdAt: x.created_at,
+      }));
+    } catch (e) { console.error("getHistory DB error:", e.message); return []; }
+  }
+  if (!q) return memHistory;
+  const s = q.toLowerCase();
+  return memHistory.filter(r =>
+    (r.trackingNumber || "").toLowerCase().includes(s) ||
+    (r.customerName || "").toLowerCase().includes(s) ||
+    (r.envelopeNumber || "").toLowerCase().includes(s));
+}
+
 async function safeFill(page, selector, value) {
   if (!value) return;
   try { await page.fill(selector, String(value)); } catch {}
 }
 
-// Parse a 2-column sheet (tracking, pnc) in either order. Handles headers, commas or tabs.
+// Split one CSV line on comma/tab/semicolon, respecting "double quoted" fields.
+function splitCsvLine(line) {
+  const out = []; let cur = ""; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { if (inQ && line[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+    else if ((ch === "," || ch === "\t" || ch === ";") && !inQ) { out.push(cur); cur = ""; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map(c => c.trim());
+}
+
+// Parse a sheet with columns: source PNC, new tracking, and optional customer name (any order).
 function parseDupCsv(csv) {
-  const lines = String(csv).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const lines = String(csv).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const rows = [];
   for (const line of lines) {
-    const cells = line.split(/[,\t;]/).map(c => c.trim().replace(/^["']|["']$/g, ""));
+    const cells = splitCsvLine(line);
     if (cells.length < 2) continue;
-    // skip header row
-    if (/track|pnc|entry|number|id/i.test(cells[0]) && /track|pnc|entry|number|id/i.test(cells[1])) continue;
-    // PNC ids look like F##X######## ; tracking is usually all digits. Detect which column is which.
-    const isPnc = s => /^F\d{2}X\d+/i.test(s);
-    let sourcePncId, trackingNumber;
-    if (isPnc(cells[0])) { sourcePncId = cells[0]; trackingNumber = cells[1]; }
-    else if (isPnc(cells[1])) { sourcePncId = cells[1]; trackingNumber = cells[0]; }
-    else { trackingNumber = cells[0]; sourcePncId = cells[1]; } // fallback: assume tracking,pnc
-    if (sourcePncId && trackingNumber) rows.push({ sourcePncId, trackingNumber });
+    if (cells.every(c => /track|pnc|entry|number|id|customer|name/i.test(c))) continue; // header
+    const pncCell = cells.find(c => /^F\d{2}X\d+/i.test(c));
+    const trackCell = cells.find(c => c !== pncCell && /^\d[\d\s-]{6,}$/.test(c));
+    const nameCell = cells.find(c => c !== pncCell && c !== trackCell && /[a-z]/i.test(c));
+    const sourcePncId = pncCell || cells[0];
+    const trackingNumber = trackCell || cells.find(c => c !== sourcePncId) || cells[1];
+    const customerName = nameCell || "";
+    if (sourcePncId && trackingNumber) rows.push({ sourcePncId, trackingNumber, customerName });
   }
   return rows;
 }
@@ -634,7 +710,7 @@ app.post("/duplicate-pnc", async (req, res) => {
 
     // ---- Loop over each PNC. The Submissions nav below is the reset between rows. ----
     for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-      const { sourcePncId, trackingNumber } = rows[rowIdx];
+      const { sourcePncId, trackingNumber, customerName } = rows[rowIdx];
       log("=== PNC " + (rowIdx + 1) + "/" + rows.length + ": " + sourcePncId + " -> " + trackingNumber + " ===");
       try {
 
@@ -961,8 +1037,9 @@ app.post("/duplicate-pnc", async (req, res) => {
     const envelopeNumber = envMatch ? envMatch[0] : (sourcePncId ? "submitted" : "Submitted - check PNSI");
     log("Envelope Number: " + envelopeNumber);
 
-        results.push({ sourcePncId, trackingNumber, envelopeNumber, success: true });
+        results.push({ sourcePncId, trackingNumber, customerName, envelopeNumber, success: true });
         session.dupResult.done = results.filter(r => r.success).length;
+        await saveHistory({ sourcePncId, trackingNumber, customerName, envelopeNumber });
 
       } catch (rowErr) {
         log("ROW ERROR (" + sourcePncId + "): " + rowErr.message);
@@ -984,6 +1061,11 @@ app.get("/dup-status/:sessionId", (req, res) => {
   const session = sessions[req.params.sessionId];
   if (!session) return res.status(404).json({ error: "Session not found" });
   res.json({ status: session.dupStatus || "unknown", result: session.dupResult || null });
+});
+
+app.get("/history", async (req, res) => {
+  const rows = await getHistory((req.query.q || "").trim());
+  res.json({ rows, count: rows.length, durable: !!pgPool });
 });
 
 
