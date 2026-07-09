@@ -1,22 +1,36 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 const BACKEND = "/api";
 const SESSION_ID = Math.random().toString(36).slice(2);
 const MAX_DUP_ROWS = 20;
 
 // Parse a 2-column sheet (source PNC + new tracking) in either order. Skips a header row.
+function splitCsvLine(line) {
+  const out = []; let cur = ""; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { if (inQ && line[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+    else if ((ch === "," || ch === "\t" || ch === ";") && !inQ) { out.push(cur); cur = ""; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out.map((c) => c.trim());
+}
+
 function parseDupRows(text) {
   const lines = String(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const rows = [];
   for (const line of lines) {
-    const cells = line.split(/[,\t;]/).map((c) => c.trim().replace(/^["']|["']$/g, ""));
+    const cells = splitCsvLine(line);
     if (cells.length < 2) continue;
-    if (/track|pnc|entry|number|id/i.test(cells[0]) && /track|pnc|entry|number|id/i.test(cells[1])) continue;
-    let sourcePncId, trackingNumber;
-    if (/^F\d{2}X\d+/i.test(cells[0])) { sourcePncId = cells[0]; trackingNumber = cells[1]; }
-    else if (/^F\d{2}X\d+/i.test(cells[1])) { sourcePncId = cells[1]; trackingNumber = cells[0]; }
-    else { sourcePncId = cells[0]; trackingNumber = cells[1]; } // fallback: assume PNC,tracking
-    if (sourcePncId && trackingNumber) rows.push({ sourcePncId, trackingNumber });
+    if (cells.every((c) => /track|pnc|entry|number|id|customer|name/i.test(c))) continue;
+    const pncCell = cells.find((c) => /^F\d{2}X\d+/i.test(c));
+    const trackCell = cells.find((c) => c !== pncCell && /^\d[\d\s-]{6,}$/.test(c));
+    const nameCell = cells.find((c) => c !== pncCell && c !== trackCell && /[a-z]/i.test(c));
+    const sourcePncId = pncCell || cells[0];
+    const trackingNumber = trackCell || cells.find((c) => c !== sourcePncId) || cells[1];
+    const customerName = nameCell || "";
+    if (sourcePncId && trackingNumber) rows.push({ sourcePncId, trackingNumber, customerName });
   }
   return rows;
 }
@@ -210,6 +224,10 @@ export default function App() {
   const [showOTP, setShowOTP] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [historyRows, setHistoryRows] = useState([]);
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyDurable, setHistoryDurable] = useState(true);
 
   const fileRef = useRef();
   const dupFileRef = useRef();
@@ -340,6 +358,24 @@ export default function App() {
     }
   };
 
+  const loadHistory = async (q = "") => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`${BACKEND}/history?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setHistoryRows(data.rows || []);
+      setHistoryDurable(data.durable !== false);
+    } catch {
+      setHistoryRows([]);
+    }
+    setHistoryLoading(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === "history") loadHistory(historyQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
 
   const pncPending = invoices.filter((inv) => inv.needsPNC && inv.pncStatus !== "success");
 
@@ -371,6 +407,9 @@ export default function App() {
           </button>
           <button onClick={() => setActiveTab("duplicate")} style={{ ...S.secondaryBtn, background: activeTab === "duplicate" ? "#3a3430" : "#2a2420", color: activeTab === "duplicate" ? "#c8a96e" : "#9b8f7e", border: "1px solid #3a3430" }}>
             PNC Duplicate
+          </button>
+          <button onClick={() => setActiveTab("history")} style={{ ...S.secondaryBtn, background: activeTab === "history" ? "#3a3430" : "#2a2420", color: activeTab === "history" ? "#c8a96e" : "#9b8f7e", border: "1px solid #3a3430" }}>
+            History
           </button>
           <button
             onClick={() => { if (!loggedIn) setShowCreds(!showCreds); }}
@@ -445,7 +484,7 @@ export default function App() {
             <div style={S.card}>
               <div style={S.sectionTitle}>PNC Duplicate — Batch</div>
               <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e", marginBottom: 20 }}>
-                Upload a CSV with two columns: source PNC to copy from, and the new tracking number. Up to {MAX_DUP_ROWS} at a time.
+                Upload a CSV with columns: source PNC to copy from, the new tracking number, and (optional) customer name. Up to {MAX_DUP_ROWS} at a time.
               </div>
               <div
                 style={S.dropzone(false)}
@@ -457,7 +496,7 @@ export default function App() {
                   {dupFileName ? dupFileName : "Click to choose a CSV file"}
                 </div>
                 <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e" }}>
-                  Columns: PNC to copy · new tracking number
+                  Columns: PNC to copy · new tracking number · customer name
                 </div>
               </div>
               {dupError && <div style={{ marginTop: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#991b1b" }}>⚠ {dupError}</div>}
@@ -473,7 +512,8 @@ export default function App() {
                       <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid #f0ece4", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>
                         <span style={{ fontFamily: "monospace", fontSize: 12, color: "#1a1612" }}>{r.sourcePncId}</span>
                         <span style={{ opacity: 0.4 }}>→</span>
-                        <span style={{ fontFamily: "monospace", fontSize: 12, color: "#6b5e4e", flex: 1 }}>{r.trackingNumber}</span>
+                        <span style={{ fontFamily: "monospace", fontSize: 12, color: "#6b5e4e" }}>{r.trackingNumber}</span>
+                        <span style={{ fontSize: 12, color: "#9b8f7e", flex: 1 }}>{r.customerName || "—"}</span>
                         {res
                           ? (res.success
                               ? <span style={S.tag("green")}>✓ {res.envelopeNumber}</span>
@@ -511,6 +551,55 @@ export default function App() {
               </div>
             )}
           </>
+        )}
+
+        {activeTab === "history" && (
+          <div style={S.card}>
+            <div style={S.sectionTitle}>Submission History</div>
+            <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e", marginBottom: 16 }}>
+              Look up a PNC envelope code by FedEx tracking number or customer name.
+            </div>
+            {!historyDurable && (
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#991b1b", marginBottom: 14 }}>
+                ⚠ No database connected — this history resets when the server restarts. Set DATABASE_URL on Render to make it permanent.
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+              <input
+                value={historyQuery}
+                onChange={(e) => setHistoryQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") loadHistory(historyQuery); }}
+                placeholder="Search tracking, customer, or PNC code…"
+                style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: "1px solid #3a3430", background: "#2a2420", color: "#e8ddd0", fontFamily: "'DM Sans', sans-serif", fontSize: 14 }}
+              />
+              <button onClick={() => loadHistory(historyQuery)} style={S.accentBtn(false)}>Search</button>
+            </div>
+
+            {historyLoading ? (
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e" }}>Loading…</div>
+            ) : historyRows.length === 0 ? (
+              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#9b8f7e" }}>No records{historyQuery ? " match your search." : " yet."}</div>
+            ) : (
+              <div>
+                <div style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "2px solid #3a3430", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#9b8f7e" }}>
+                  <span style={{ flex: 1.4 }}>Tracking #</span>
+                  <span style={{ flex: 1.4 }}>Customer</span>
+                  <span style={{ flex: 1.2 }}>PNC Code</span>
+                  <span style={{ flex: 1 }}>Date</span>
+                </div>
+                {historyRows.map((r, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, padding: "10px 0", borderBottom: "1px solid #2a2420", fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#e8ddd0" }}>
+                    <span style={{ flex: 1.4, fontFamily: "monospace", fontSize: 12 }}>{r.trackingNumber}</span>
+                    <span style={{ flex: 1.4 }}>{r.customerName || "—"}</span>
+                    <span style={{ flex: 1.2, fontFamily: "monospace", fontSize: 12, color: "#c8a96e", cursor: "pointer" }}
+                      onClick={() => navigator.clipboard?.writeText(r.envelopeNumber)}
+                      title="Click to copy">{r.envelopeNumber}</span>
+                    <span style={{ flex: 1, fontSize: 12, color: "#9b8f7e" }}>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
